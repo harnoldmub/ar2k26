@@ -1,0 +1,696 @@
+import { useEffect, useState } from "react";
+import { useQuery, useMutation } from "@tanstack/react-query";
+import { LogOut, Search, Users, Table2, Download, Mail, Edit, Trash2 } from "lucide-react";
+import { Button } from "@/components/ui/button";
+import { Card } from "@/components/ui/card";
+import { Input } from "@/components/ui/input";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+  DialogTrigger,
+} from "@/components/ui/dialog";
+import { Label } from "@/components/ui/label";
+import { Textarea } from "@/components/ui/textarea";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from "@/components/ui/table";
+import { useToast } from "@/hooks/use-toast";
+import { useAuth } from "@/hooks/useAuth";
+import { apiRequest, queryClient } from "@/lib/queryClient";
+import { isUnauthorizedError } from "@/lib/authUtils";
+import type { RsvpResponse } from "@shared/schema";
+
+export default function Admin() {
+  const { toast } = useToast();
+  const { user, isAuthenticated, isLoading } = useAuth();
+  const [searchQuery, setSearchQuery] = useState("");
+  const [filterAvailability, setFilterAvailability] = useState<string>("all");
+  const [inviteDialogOpen, setInviteDialogOpen] = useState(false);
+  const [inviteEmail, setInviteEmail] = useState("");
+  const [inviteFirstName, setInviteFirstName] = useState("");
+  const [inviteLastName, setInviteLastName] = useState("");
+  const [inviteMessage, setInviteMessage] = useState("");
+  
+  const [editDialogOpen, setEditDialogOpen] = useState(false);
+  const [editingResponse, setEditingResponse] = useState<RsvpResponse | null>(null);
+  const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
+  const [deletingId, setDeletingId] = useState<number | null>(null);
+
+  // Redirect to login if not authenticated
+  useEffect(() => {
+    if (!isLoading && !isAuthenticated) {
+      toast({
+        title: "Non autorisé",
+        description: "Connexion requise. Redirection...",
+        variant: "destructive",
+      });
+      setTimeout(() => {
+        window.location.href = "/login";
+      }, 500);
+    }
+  }, [isAuthenticated, isLoading, toast]);
+
+  const { data: responses = [], isLoading: responsesLoading } = useQuery<RsvpResponse[]>({
+    queryKey: ["/api/rsvp"],
+    enabled: isAuthenticated,
+  });
+
+  const updateTableMutation = useMutation({
+    mutationFn: async ({ id, tableNumber }: { id: number; tableNumber: number | null }) => {
+      return await apiRequest("PATCH", `/api/rsvp/${id}`, { tableNumber });
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/rsvp"] });
+      toast({
+        title: "Succès",
+        description: "Table mise à jour",
+      });
+    },
+    onError: (error: Error) => {
+      if (isUnauthorizedError(error)) {
+        toast({
+          title: "Non autorisé",
+          description: "Vous êtes déconnecté. Reconnexion...",
+          variant: "destructive",
+        });
+        setTimeout(() => {
+          window.location.href = "/login";
+        }, 500);
+        return;
+      }
+      toast({
+        title: "Erreur",
+        description: "Impossible de mettre à jour la table",
+        variant: "destructive",
+      });
+    },
+  });
+
+  const sendInvitationMutation = useMutation({
+    mutationFn: async (data: { email: string; firstName: string; lastName: string; message?: string }) => {
+      return await apiRequest("POST", "/api/send-invitation", data);
+    },
+    onSuccess: () => {
+      toast({
+        title: "Invitation envoyée",
+        description: "L'invitation a été envoyée avec succès",
+      });
+      setInviteDialogOpen(false);
+      setInviteEmail("");
+      setInviteFirstName("");
+      setInviteLastName("");
+      setInviteMessage("");
+    },
+    onError: (error: Error) => {
+      if (isUnauthorizedError(error)) {
+        toast({
+          title: "Non autorisé",
+          description: "Vous êtes déconnecté. Reconnexion...",
+          variant: "destructive",
+        });
+        setTimeout(() => {
+          window.location.href = "/login";
+        }, 500);
+        return;
+      }
+      toast({
+        title: "Erreur",
+        description: "Impossible d'envoyer l'invitation",
+        variant: "destructive",
+      });
+    },
+  });
+
+  const deleteRsvpMutation = useMutation({
+    mutationFn: async (id: number) => {
+      return await apiRequest("DELETE", `/api/rsvp/${id}`);
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/rsvp"] });
+      toast({
+        title: "Suppression réussie",
+        description: "La réponse a été supprimée",
+      });
+      setDeleteDialogOpen(false);
+      setDeletingId(null);
+    },
+    onError: () => {
+      toast({
+        title: "Erreur",
+        description: "Impossible de supprimer la réponse",
+        variant: "destructive",
+      });
+    },
+  });
+
+  const updateRsvpMutation = useMutation({
+    mutationFn: async ({ id, data }: { id: number; data: Omit<RsvpResponse, 'id' | 'createdAt'> }) => {
+      return await apiRequest("PUT", `/api/rsvp/${id}`, data);
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/rsvp"] });
+      toast({
+        title: "Modification réussie",
+        description: "La réponse a été mise à jour",
+      });
+      setEditDialogOpen(false);
+      setEditingResponse(null);
+    },
+    onError: () => {
+      toast({
+        title: "Erreur",
+        description: "Impossible de modifier la réponse",
+        variant: "destructive",
+      });
+    },
+  });
+
+  const handleExportCSV = () => {
+    window.open('/api/rsvp/export/csv', '_blank');
+  };
+
+  const handleSendInvitation = () => {
+    if (!inviteEmail || !inviteFirstName || !inviteLastName) {
+      toast({
+        title: "Champs manquants",
+        description: "Veuillez remplir tous les champs requis",
+        variant: "destructive",
+      });
+      return;
+    }
+    sendInvitationMutation.mutate({
+      email: inviteEmail,
+      firstName: inviteFirstName,
+      lastName: inviteLastName,
+      message: inviteMessage,
+    });
+  };
+
+  const handleLogout = async () => {
+    try {
+      await fetch("/api/logout", { method: "POST" });
+      window.location.href = "/login";
+    } catch (error) {
+      toast({
+        title: "Erreur",
+        description: "Impossible de se déconnecter",
+        variant: "destructive",
+      });
+    }
+  };
+
+  // Filter responses
+  const filteredResponses = responses.filter((response) => {
+    const matchesSearch =
+      searchQuery === "" ||
+      `${response.firstName} ${response.lastName}`
+        .toLowerCase()
+        .includes(searchQuery.toLowerCase());
+    
+    const matchesAvailability =
+      filterAvailability === "all" || response.availability === filterAvailability;
+
+    return matchesSearch && matchesAvailability;
+  });
+
+  // Stats
+  const stats = {
+    total: responses.length,
+    both: responses.filter(r => r.availability === 'both').length,
+    march19: responses.filter(r => r.availability === '19-march').length,
+    march21: responses.filter(r => r.availability === '21-march').length,
+    unavailable: responses.filter(r => r.availability === 'unavailable').length,
+    assigned: responses.filter(r => r.tableNumber !== null).length,
+  };
+
+  if (!isAuthenticated && !isLoading) {
+    return null;
+  }
+
+  return (
+    <div className="min-h-screen bg-background">
+      {/* Header */}
+      <header className="sticky top-0 z-40 border-b bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60">
+        <div className="container flex h-16 items-center justify-between px-6">
+          <div className="flex items-center gap-3">
+            <div className="p-2 rounded-lg bg-primary/10">
+              <Users className="h-6 w-6 text-primary" />
+            </div>
+            <div>
+              <h1 className="text-xl font-serif font-bold text-foreground">
+                Espace Administrateur
+              </h1>
+              <p className="text-xs text-muted-foreground font-sans">
+                Gestion des invités
+              </p>
+            </div>
+          </div>
+          <Button
+            variant="outline"
+            onClick={handleLogout}
+            data-testid="button-logout"
+          >
+            <LogOut className="h-4 w-4 mr-2" />
+            Déconnexion
+          </Button>
+        </div>
+      </header>
+
+      <div className="container px-6 py-8">
+        {/* Stats Cards */}
+        <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-3 md:gap-4 mb-8">
+          <Card className="p-3 md:p-4">
+            <div className="text-xl md:text-2xl font-bold text-foreground">{stats.total}</div>
+            <div className="text-xs md:text-sm text-muted-foreground font-sans leading-tight">Total réponses</div>
+          </Card>
+          <Card className="p-3 md:p-4">
+            <div className="text-xl md:text-2xl font-bold text-primary">{stats.both}</div>
+            <div className="text-xs md:text-sm text-muted-foreground font-sans leading-tight">Les deux dates</div>
+          </Card>
+          <Card className="p-3 md:p-4">
+            <div className="text-xl md:text-2xl font-bold text-foreground">{stats.march19}</div>
+            <div className="text-xs md:text-sm text-muted-foreground font-sans leading-tight">19 mars</div>
+          </Card>
+          <Card className="p-3 md:p-4">
+            <div className="text-xl md:text-2xl font-bold text-foreground">{stats.march21}</div>
+            <div className="text-xs md:text-sm text-muted-foreground font-sans leading-tight">21 mars</div>
+          </Card>
+          <Card className="p-3 md:p-4">
+            <div className="text-xl md:text-2xl font-bold text-muted-foreground">{stats.unavailable}</div>
+            <div className="text-xs md:text-sm text-muted-foreground font-sans leading-tight">Indisponibles</div>
+          </Card>
+          <Card className="p-3 md:p-4">
+            <div className="text-xl md:text-2xl font-bold text-chart-2">{stats.assigned}</div>
+            <div className="text-xs md:text-sm text-muted-foreground font-sans leading-tight">Places attribuées</div>
+          </Card>
+        </div>
+
+        {/* Actions & Filters */}
+        <Card className="p-6 mb-8">
+          <div className="flex flex-col gap-4">
+            <div className="flex flex-col sm:flex-row gap-3 justify-between items-start sm:items-center">
+              <h3 className="font-serif font-semibold text-lg">Gestion des invités</h3>
+              <div className="flex gap-2 w-full sm:w-auto">
+                <Button
+                  variant="outline"
+                  onClick={handleExportCSV}
+                  data-testid="button-export-csv"
+                  className="flex-1 sm:flex-none"
+                >
+                  <Download className="h-4 w-4 mr-2" />
+                  Exporter CSV
+                </Button>
+                <Dialog open={inviteDialogOpen} onOpenChange={setInviteDialogOpen}>
+                  <DialogTrigger asChild>
+                    <Button data-testid="button-send-invitation" className="flex-1 sm:flex-none">
+                      <Mail className="h-4 w-4 mr-2" />
+                      Envoyer invitation
+                    </Button>
+                  </DialogTrigger>
+                  <DialogContent>
+                    <DialogHeader>
+                      <DialogTitle>Envoyer une invitation personnalisée</DialogTitle>
+                      <DialogDescription>
+                        Envoyez une invitation par email à un invité avec un message personnalisé.
+                      </DialogDescription>
+                    </DialogHeader>
+                    <div className="space-y-4 py-4">
+                      <div className="space-y-2">
+                        <Label htmlFor="invite-email">Email *</Label>
+                        <Input
+                          id="invite-email"
+                          type="email"
+                          placeholder="exemple@email.com"
+                          value={inviteEmail}
+                          onChange={(e) => setInviteEmail(e.target.value)}
+                          data-testid="input-invite-email"
+                        />
+                      </div>
+                      <div className="grid grid-cols-2 gap-4">
+                        <div className="space-y-2">
+                          <Label htmlFor="invite-firstname">Prénom *</Label>
+                          <Input
+                            id="invite-firstname"
+                            placeholder="Jean"
+                            value={inviteFirstName}
+                            onChange={(e) => setInviteFirstName(e.target.value)}
+                            data-testid="input-invite-firstname"
+                          />
+                        </div>
+                        <div className="space-y-2">
+                          <Label htmlFor="invite-lastname">Nom *</Label>
+                          <Input
+                            id="invite-lastname"
+                            placeholder="Dupont"
+                            value={inviteLastName}
+                            onChange={(e) => setInviteLastName(e.target.value)}
+                            data-testid="input-invite-lastname"
+                          />
+                        </div>
+                      </div>
+                      <div className="space-y-2">
+                        <Label htmlFor="invite-message">Message personnalisé (optionnel)</Label>
+                        <Textarea
+                          id="invite-message"
+                          placeholder="Nous serions honorés de votre présence à notre mariage..."
+                          value={inviteMessage}
+                          onChange={(e) => setInviteMessage(e.target.value)}
+                          rows={4}
+                          data-testid="textarea-invite-message"
+                        />
+                      </div>
+                    </div>
+                    <DialogFooter>
+                      <Button
+                        variant="outline"
+                        onClick={() => setInviteDialogOpen(false)}
+                        data-testid="button-cancel-invitation"
+                      >
+                        Annuler
+                      </Button>
+                      <Button
+                        onClick={handleSendInvitation}
+                        disabled={sendInvitationMutation.isPending}
+                        data-testid="button-confirm-send-invitation"
+                      >
+                        {sendInvitationMutation.isPending ? "Envoi..." : "Envoyer"}
+                      </Button>
+                    </DialogFooter>
+                  </DialogContent>
+                </Dialog>
+              </div>
+            </div>
+            <div className="flex flex-col md:flex-row gap-4">
+              <div className="relative flex-1">
+                <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+                <Input
+                  placeholder="Rechercher un invité..."
+                  value={searchQuery}
+                  onChange={(e) => setSearchQuery(e.target.value)}
+                  className="pl-10"
+                  data-testid="input-search-guest"
+                />
+              </div>
+              <Select value={filterAvailability} onValueChange={setFilterAvailability}>
+                <SelectTrigger className="w-full md:w-[200px]" data-testid="select-filter-availability">
+                  <SelectValue placeholder="Filtrer par disponibilité" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">Toutes les réponses</SelectItem>
+                  <SelectItem value="both">Les deux dates</SelectItem>
+                  <SelectItem value="19-march">19 mars seulement</SelectItem>
+                  <SelectItem value="21-march">21 mars seulement</SelectItem>
+                  <SelectItem value="unavailable">Indisponibles</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+          </div>
+        </Card>
+
+        {/* Table */}
+        <Card>
+          <div className="overflow-x-auto">
+            <Table>
+              <TableHeader>
+                <TableRow>
+                  <TableHead className="font-sans">Prénom</TableHead>
+                  <TableHead className="font-sans">Nom</TableHead>
+                  <TableHead className="font-sans">Email</TableHead>
+                  <TableHead className="font-sans">Personnes</TableHead>
+                  <TableHead className="font-sans">Disponibilité</TableHead>
+                  <TableHead className="font-sans">Table attribuée</TableHead>
+                  <TableHead className="font-sans">Date de réponse</TableHead>
+                  <TableHead className="font-sans">Actions</TableHead>
+                </TableRow>
+              </TableHeader>
+              <TableBody>
+                {responsesLoading ? (
+                  <TableRow>
+                    <TableCell colSpan={8} className="text-center py-8 text-muted-foreground">
+                      Chargement...
+                    </TableCell>
+                  </TableRow>
+                ) : filteredResponses.length === 0 ? (
+                  <TableRow>
+                    <TableCell colSpan={8} className="text-center py-8 text-muted-foreground">
+                      Aucun invité trouvé
+                    </TableCell>
+                  </TableRow>
+                ) : (
+                  filteredResponses.map((response) => (
+                    <TableRow key={response.id} data-testid={`row-guest-${response.id}`}>
+                      <TableCell className="font-sans">{response.firstName}</TableCell>
+                      <TableCell className="font-sans">{response.lastName}</TableCell>
+                      <TableCell className="font-sans text-sm text-muted-foreground" data-testid={`text-email-${response.id}`}>
+                        {response.email}
+                      </TableCell>
+                      <TableCell className="font-sans">
+                        <span className="inline-flex items-center px-2 py-1 rounded-full text-xs bg-muted">
+                          {response.partySize === 1 ? 'Solo (1)' : 'Couple (2)'}
+                        </span>
+                      </TableCell>
+                      <TableCell>
+                        <span className={`inline-flex items-center px-2 py-1 rounded-full text-xs font-sans ${
+                          response.availability === 'both' 
+                            ? 'bg-chart-2/10 text-chart-2'
+                            : response.availability === 'unavailable'
+                            ? 'bg-muted text-muted-foreground'
+                            : 'bg-primary/10 text-primary'
+                        }`}>
+                          {response.availability === 'both' && 'Les deux dates'}
+                          {response.availability === '19-march' && '19 mars'}
+                          {response.availability === '21-march' && '21 mars'}
+                          {response.availability === 'unavailable' && 'Indisponible'}
+                        </span>
+                      </TableCell>
+                      <TableCell>
+                        <div className="flex items-center gap-2">
+                          <Table2 className="h-4 w-4 text-muted-foreground" />
+                          <span className="font-sans text-sm" data-testid={`text-table-${response.id}`}>
+                            {response.tableNumber ? `Table ${response.tableNumber}` : 'Non attribuée'}
+                          </span>
+                        </div>
+                      </TableCell>
+                      <TableCell className="text-muted-foreground font-sans text-sm">
+                        {new Date(response.createdAt!).toLocaleDateString('fr-FR', {
+                          day: '2-digit',
+                          month: 'short',
+                          year: 'numeric',
+                        })}
+                      </TableCell>
+                      <TableCell>
+                        <div className="flex items-center gap-2">
+                          <Button
+                            variant="ghost"
+                            size="icon"
+                            onClick={() => {
+                              setEditingResponse(response);
+                              setEditDialogOpen(true);
+                            }}
+                            data-testid={`button-edit-${response.id}`}
+                          >
+                            <Edit className="h-4 w-4" />
+                          </Button>
+                          <Button
+                            variant="ghost"
+                            size="icon"
+                            onClick={() => {
+                              setDeletingId(response.id);
+                              setDeleteDialogOpen(true);
+                            }}
+                            data-testid={`button-delete-${response.id}`}
+                          >
+                            <Trash2 className="h-4 w-4 text-destructive" />
+                          </Button>
+                        </div>
+                      </TableCell>
+                    </TableRow>
+                  ))
+                )}
+              </TableBody>
+            </Table>
+          </div>
+        </Card>
+
+        {/* Delete Dialog */}
+        <Dialog open={deleteDialogOpen} onOpenChange={setDeleteDialogOpen}>
+          <DialogContent>
+            <DialogHeader>
+              <DialogTitle>Confirmer la suppression</DialogTitle>
+              <DialogDescription>
+                Êtes-vous sûr de vouloir supprimer cette réponse ? Cette action est irréversible.
+              </DialogDescription>
+            </DialogHeader>
+            <DialogFooter>
+              <Button
+                variant="outline"
+                onClick={() => {
+                  setDeleteDialogOpen(false);
+                  setDeletingId(null);
+                }}
+                data-testid="button-cancel-delete"
+              >
+                Annuler
+              </Button>
+              <Button
+                variant="destructive"
+                onClick={() => {
+                  if (deletingId) {
+                    deleteRsvpMutation.mutate(deletingId);
+                  }
+                }}
+                disabled={deleteRsvpMutation.isPending}
+                data-testid="button-confirm-delete"
+              >
+                {deleteRsvpMutation.isPending ? "Suppression..." : "Supprimer"}
+              </Button>
+            </DialogFooter>
+          </DialogContent>
+        </Dialog>
+
+        {/* Edit Dialog */}
+        <Dialog open={editDialogOpen} onOpenChange={setEditDialogOpen}>
+          <DialogContent className="max-w-2xl">
+            <DialogHeader>
+              <DialogTitle>Modifier la réponse</DialogTitle>
+              <DialogDescription>
+                Modifiez les informations de l'invité.
+              </DialogDescription>
+            </DialogHeader>
+            {editingResponse && (
+              <div className="space-y-4 py-4">
+                <div className="grid grid-cols-2 gap-4">
+                  <div className="space-y-2">
+                    <Label htmlFor="edit-firstname">Prénom *</Label>
+                    <Input
+                      id="edit-firstname"
+                      value={editingResponse.firstName}
+                      onChange={(e) => setEditingResponse({ ...editingResponse, firstName: e.target.value })}
+                      data-testid="input-edit-firstname"
+                    />
+                  </div>
+                  <div className="space-y-2">
+                    <Label htmlFor="edit-lastname">Nom *</Label>
+                    <Input
+                      id="edit-lastname"
+                      value={editingResponse.lastName}
+                      onChange={(e) => setEditingResponse({ ...editingResponse, lastName: e.target.value })}
+                      data-testid="input-edit-lastname"
+                    />
+                  </div>
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="edit-email">Email *</Label>
+                  <Input
+                    id="edit-email"
+                    type="email"
+                    value={editingResponse.email}
+                    onChange={(e) => setEditingResponse({ ...editingResponse, email: e.target.value })}
+                    data-testid="input-edit-email"
+                  />
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="edit-partysize">Nombre de personnes *</Label>
+                  <Select
+                    value={editingResponse.partySize?.toString()}
+                    onValueChange={(value) => setEditingResponse({ ...editingResponse, partySize: parseInt(value) })}
+                  >
+                    <SelectTrigger data-testid="select-edit-partysize">
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="1">Solo (1 personne)</SelectItem>
+                      <SelectItem value="2">Couple (2 personnes)</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="edit-availability">Disponibilité *</Label>
+                  <Select
+                    value={editingResponse.availability}
+                    onValueChange={(value) => setEditingResponse({ ...editingResponse, availability: value })}
+                  >
+                    <SelectTrigger data-testid="select-edit-availability">
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="19-march">19 mars seulement</SelectItem>
+                      <SelectItem value="21-march">21 mars seulement</SelectItem>
+                      <SelectItem value="both">Les deux dates</SelectItem>
+                      <SelectItem value="unavailable">Je ne serai pas disponible</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="edit-table">Numéro de table (optionnel)</Label>
+                  <Input
+                    id="edit-table"
+                    type="number"
+                    min="1"
+                    placeholder="Attribuer un numéro de table"
+                    value={editingResponse.tableNumber ?? ''}
+                    onChange={(e) => {
+                      const value = e.target.value === '' ? null : parseInt(e.target.value);
+                      setEditingResponse({ ...editingResponse, tableNumber: value });
+                    }}
+                    data-testid="input-edit-table"
+                  />
+                </div>
+              </div>
+            )}
+            <DialogFooter>
+              <Button
+                variant="outline"
+                onClick={() => {
+                  setEditDialogOpen(false);
+                  setEditingResponse(null);
+                }}
+                data-testid="button-cancel-edit"
+              >
+                Annuler
+              </Button>
+              <Button
+                onClick={() => {
+                  if (editingResponse) {
+                    updateRsvpMutation.mutate({
+                      id: editingResponse.id,
+                      data: {
+                        firstName: editingResponse.firstName,
+                        lastName: editingResponse.lastName,
+                        email: editingResponse.email,
+                        partySize: editingResponse.partySize,
+                        availability: editingResponse.availability,
+                        tableNumber: editingResponse.tableNumber,
+                        notes: editingResponse.notes,
+                      }
+                    });
+                  }
+                }}
+                disabled={updateRsvpMutation.isPending}
+                data-testid="button-confirm-edit"
+              >
+                {updateRsvpMutation.isPending ? "Enregistrement..." : "Enregistrer"}
+              </Button>
+            </DialogFooter>
+          </DialogContent>
+        </Dialog>
+      </div>
+    </div>
+  );
+}

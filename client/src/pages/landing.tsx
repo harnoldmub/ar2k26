@@ -1,0 +1,831 @@
+import { useState, useEffect } from "react";
+import { useForm } from "react-hook-form";
+import { zodResolver } from "@hookform/resolvers/zod";
+import { useMutation, useQuery } from "@tanstack/react-query";
+import {
+  Calendar,
+  Heart,
+  ChevronDown,
+  X,
+  Share2,
+  Facebook,
+  Twitter,
+  MessageCircle,
+  Link2,
+  Check,
+} from "lucide-react";
+import { Button } from "@/components/ui/button";
+import { Card } from "@/components/ui/card";
+import {
+  Form,
+  FormControl,
+  FormField,
+  FormItem,
+  FormLabel,
+  FormMessage,
+} from "@/components/ui/form";
+import { Input } from "@/components/ui/input";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
+import { useToast } from "@/hooks/use-toast";
+import {
+  insertRsvpResponseSchema,
+  type InsertRsvpResponse,
+} from "@shared/schema";
+import { apiRequest, queryClient } from "@/lib/queryClient";
+import heroImage from "@assets/IMG_6360_1760648841327.jpg";
+import ruthPortrait from "@assets/ar-gallery_1760648320766.png";
+import arnoldPortrait from "@assets/rk-gallery_1760648320767.png";
+import gallery1 from "@assets/IMG_6337_1760648863844.jpg";
+import gallery2 from "@assets/IMG_6346_1760648863844.jpg";
+import gallery3 from "@assets/IMG_6359_1760648863845.jpg";
+import gallery4 from "@assets/IMG_6362_1760648863845.jpg";
+import gallery5 from "@assets/IMG_7449_1760648927188.jpg";
+import gallery6 from "@assets/IMG_1122_1760648927187.jpg";
+
+const galleryImages = [
+  {
+    id: "walking-together",
+    src: gallery1,
+    alt: "Promenade complice dans le parc",
+  },
+  {
+    id: "proposal-marry-me",
+    src: gallery2,
+    alt: "La grande demande - Marry Me",
+  },
+  {
+    id: "engagement-bouquet",
+    src: gallery3,
+    alt: "Nos fiançailles avec le bouquet",
+  },
+  { id: "kiss-bouquet", src: gallery4, alt: "Notre baiser avec les roses" },
+  { id: "selfie-outdoor", src: gallery5, alt: "Selfie en amoureux" },
+  { id: "fun-selfie", src: gallery6, alt: "Moment de complicité" },
+];
+
+function Countdown() {
+  const [timeLeft, setTimeLeft] = useState({
+    days: 0,
+    hours: 0,
+    minutes: 0,
+    seconds: 0,
+  });
+
+  useEffect(() => {
+    const weddingDate = new Date("2026-03-19T00:00:00");
+
+    const timer = setInterval(() => {
+      const now = new Date();
+      const difference = weddingDate.getTime() - now.getTime();
+
+      if (difference > 0) {
+        setTimeLeft({
+          days: Math.floor(difference / (1000 * 60 * 60 * 24)),
+          hours: Math.floor((difference / (1000 * 60 * 60)) % 24),
+          minutes: Math.floor((difference / 1000 / 60) % 60),
+          seconds: Math.floor((difference / 1000) % 60),
+        });
+      }
+    }, 1000);
+
+    return () => clearInterval(timer);
+  }, []);
+
+  return (
+    <div className="flex gap-4 md:gap-8 justify-center items-center flex-wrap">
+      {[
+        { value: timeLeft.days, label: "Jours", testId: "countdown-days" },
+        { value: timeLeft.hours, label: "Heures", testId: "countdown-hours" },
+        {
+          value: timeLeft.minutes,
+          label: "Minutes",
+          testId: "countdown-minutes",
+        },
+        {
+          value: timeLeft.seconds,
+          label: "Secondes",
+          testId: "countdown-seconds",
+        },
+      ].map((item, idx) => (
+        <div key={idx} className="flex flex-col items-center">
+          <div className="w-16 h-16 md:w-20 md:h-20 rounded-lg bg-primary/10 border border-primary/20 flex items-center justify-center">
+            <span
+              className="text-2xl md:text-3xl font-serif font-bold text-primary"
+              data-testid={item.testId}
+            >
+              {item.value.toString().padStart(2, "0")}
+            </span>
+          </div>
+          <span className="text-xs md:text-sm text-muted-foreground mt-2 font-sans">
+            {item.label}
+          </span>
+        </div>
+      ))}
+    </div>
+  );
+}
+
+function Lightbox({
+  src,
+  alt,
+  photoId,
+  onClose,
+}: {
+  src: string;
+  alt: string;
+  photoId?: string;
+  onClose: () => void;
+}) {
+  const [linkCopied, setLinkCopied] = useState(false);
+
+  // Create a photo-specific shareable link
+  const shareUrl = photoId
+    ? `${window.location.origin}?photo=${photoId}#galerie`
+    : `${window.location.origin}#galerie`;
+  const fullShareText = `Découvrez "${alt}" du mariage de Ruth & Arnold`;
+
+  const handleCopyLink = async () => {
+    try {
+      await navigator.clipboard.writeText(`${fullShareText} - ${shareUrl}`);
+      setLinkCopied(true);
+      setTimeout(() => setLinkCopied(false), 2000);
+    } catch (err) {
+      console.error("Failed to copy link:", err);
+    }
+  };
+
+  const handleFacebookShare = () => {
+    window.open(
+      `https://www.facebook.com/sharer/sharer.php?u=${encodeURIComponent(shareUrl)}&quote=${encodeURIComponent(fullShareText)}`,
+      "_blank",
+      "width=600,height=400",
+    );
+  };
+
+  const handleTwitterShare = () => {
+    window.open(
+      `https://twitter.com/intent/tweet?url=${encodeURIComponent(shareUrl)}&text=${encodeURIComponent(fullShareText)}`,
+      "_blank",
+      "width=600,height=400",
+    );
+  };
+
+  const handleWhatsAppShare = () => {
+    window.open(
+      `https://wa.me/?text=${encodeURIComponent(fullShareText + " " + shareUrl)}`,
+      "_blank",
+    );
+  };
+
+  return (
+    <div
+      className="fixed inset-0 z-50 bg-black/90 flex items-center justify-center p-4 animate-in fade-in duration-300"
+      onClick={onClose}
+      data-testid="lightbox-overlay"
+    >
+      <div className="absolute top-4 right-4 flex gap-2">
+        <Button
+          size="icon"
+          variant="ghost"
+          className="text-white hover:bg-white/20"
+          onClick={onClose}
+          data-testid="button-close-lightbox"
+        >
+          <X className="h-6 w-6" />
+        </Button>
+      </div>
+
+      <div className="flex flex-col items-center gap-4 max-w-5xl w-full">
+        <img
+          src={src}
+          alt={alt}
+          className="max-w-full max-h-[70vh] object-contain rounded-lg"
+          onClick={(e) => e.stopPropagation()}
+        />
+
+        <div
+          className="flex flex-wrap gap-2 justify-center items-center bg-white/10 backdrop-blur-sm rounded-full px-6 py-3"
+          onClick={(e) => e.stopPropagation()}
+        >
+          <span className="text-white text-sm font-sans mr-2 hidden sm:inline">
+            Partager :
+          </span>
+          <Button
+            size="sm"
+            variant="ghost"
+            className="text-white hover:bg-white/20 rounded-full gap-2"
+            onClick={handleFacebookShare}
+            data-testid="button-share-facebook"
+          >
+            <Facebook className="h-4 w-4" />
+            <span className="hidden sm:inline">Facebook</span>
+          </Button>
+          <Button
+            size="sm"
+            variant="ghost"
+            className="text-white hover:bg-white/20 rounded-full gap-2"
+            onClick={handleTwitterShare}
+            data-testid="button-share-twitter"
+          >
+            <Twitter className="h-4 w-4" />
+            <span className="hidden sm:inline">Twitter</span>
+          </Button>
+          <Button
+            size="sm"
+            variant="ghost"
+            className="text-white hover:bg-white/20 rounded-full gap-2"
+            onClick={handleWhatsAppShare}
+            data-testid="button-share-whatsapp"
+          >
+            <MessageCircle className="h-4 w-4" />
+            <span className="hidden sm:inline">WhatsApp</span>
+          </Button>
+          <Button
+            size="sm"
+            variant="ghost"
+            className="text-white hover:bg-white/20 rounded-full gap-2"
+            onClick={handleCopyLink}
+            data-testid="button-copy-link"
+          >
+            {linkCopied ? (
+              <Check className="h-4 w-4" />
+            ) : (
+              <Link2 className="h-4 w-4" />
+            )}
+            <span className="hidden sm:inline">
+              {linkCopied ? "Copié !" : "Copier lien"}
+            </span>
+          </Button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+export default function Landing() {
+  const { toast } = useToast();
+  const [lightboxImage, setLightboxImage] = useState<{
+    id?: string;
+    src: string;
+    alt: string;
+  } | null>(null);
+  const [isSubmitted, setIsSubmitted] = useState(false);
+
+  const form = useForm<InsertRsvpResponse>({
+    resolver: zodResolver(insertRsvpResponseSchema),
+    defaultValues: {
+      firstName: "",
+      lastName: "",
+      email: "",
+      partySize: 1,
+      availability: undefined,
+    },
+  });
+
+  const rsvpMutation = useMutation({
+    mutationFn: async (data: InsertRsvpResponse) => {
+      return await apiRequest("POST", "/api/rsvp", data);
+    },
+    onSuccess: () => {
+      setIsSubmitted(true);
+      form.reset();
+      queryClient.invalidateQueries({ queryKey: ["/api/rsvp"] });
+
+      setTimeout(() => {
+        const element = document.getElementById("rsvp-success");
+        element?.scrollIntoView({ behavior: "smooth", block: "center" });
+      }, 100);
+    },
+    onError: (error: Error) => {
+      toast({
+        title: "Erreur",
+        description: "Une erreur s'est produite. Veuillez réessayer.",
+        variant: "destructive",
+      });
+    },
+  });
+
+  const onSubmit = (data: InsertRsvpResponse) => {
+    rsvpMutation.mutate(data);
+  };
+
+  return (
+    <div className="min-h-screen bg-background">
+      {/* Hero Section */}
+      <section className="relative min-h-screen flex items-center justify-center overflow-hidden bg-background">
+        <div
+          className="absolute inset-0 bg-cover bg-center opacity-20"
+          style={{
+            backgroundImage: `url(${heroImage})`,
+          }}
+        />
+        <div className="absolute inset-0 bg-gradient-to-b from-background/60 via-background/40 to-background" />
+
+        <div className="relative z-10 text-center px-6 max-w-6xl mx-auto">
+          <div className="mb-12">
+            <p className="text-sm md:text-base font-sans tracking-[0.3em] uppercase text-muted-foreground mb-8">
+              Celebrating Love
+            </p>
+          </div>
+
+          <h1 className="text-6xl md:text-8xl lg:text-9xl font-serif font-light text-primary mb-8 leading-tight">
+            RUTH
+            <br />
+            <span className="text-foreground">&</span>
+            <br />
+            ARNOLD
+          </h1>
+
+          <p className="text-base md:text-lg font-sans text-foreground mb-6 tracking-wide">
+            19 & 21 Mars 2026
+          </p>
+
+          <p className="text-sm md:text-base font-sans text-foreground/90 mb-16 max-w-2xl mx-auto leading-relaxed">
+            Rejoignez-nous pour célébrer notre union lors de deux journées
+            inoubliables
+            <br />
+            Un mariage traditionnel et une grande fête pour partager notre
+            bonheur avec vous
+          </p>
+
+          <div>
+            <Button
+              variant="outline"
+              size="lg"
+              className="rounded-none px-12 py-6 text-sm tracking-widest uppercase border-2 hover-elevate"
+              onClick={() => {
+                document
+                  .getElementById("story")
+                  ?.scrollIntoView({ behavior: "smooth" });
+              }}
+              data-testid="button-voir-plus"
+            >
+              Découvrir
+            </Button>
+          </div>
+        </div>
+
+        <div className="absolute bottom-8 left-1/2 -translate-x-1/2 animate-bounce">
+          <ChevronDown className="h-6 w-6 text-muted-foreground/60" />
+        </div>
+      </section>
+
+      {/* Story Section */}
+      <section
+        id="story"
+        className="py-24 md:py-32 lg:py-40 px-6 bg-background"
+      >
+        <div className="max-w-7xl mx-auto">
+          <div className="grid grid-cols-1 lg:grid-cols-3 gap-12 lg:gap-16 items-center">
+            {/* Arnold Portrait */}
+            <div className="order-2 lg:order-1">
+              <div
+                className="aspect-[3/4] overflow-hidden bg-muted"
+                data-testid="card-arnold"
+              >
+                <img
+                  src={arnoldPortrait}
+                  alt="Arnold"
+                  className="w-full h-full object-cover"
+                  data-testid="img-arnold"
+                />
+              </div>
+            </div>
+
+            {/* Center Text */}
+            <div className="order-1 lg:order-2 text-center px-4 lg:px-8">
+              <h2 className="text-3xl md:text-4xl font-serif font-light text-foreground mb-8 tracking-wide">
+                NOTRE HISTOIRE
+              </h2>
+
+              <div className="h-px w-16 bg-primary mx-auto mb-8" />
+
+              <p className="text-sm md:text-base font-sans leading-relaxed text-muted-foreground mb-8 italic">
+                "Notre histoire a commencé comme un conte de fées moderne. Deux
+                âmes destinées à se rencontrer, réunies par le destin et
+                l'amour."
+              </p>
+
+              <p className="text-xs md:text-sm font-sans text-foreground tracking-widest">
+                Ruth & Arnold
+              </p>
+            </div>
+
+            {/* Ruth Portrait */}
+            <div className="order-3">
+              <div
+                className="aspect-[3/4] overflow-hidden bg-muted"
+                data-testid="card-ruth"
+              >
+                <img
+                  src={ruthPortrait}
+                  alt="Ruth"
+                  className="w-full h-full object-cover"
+                  data-testid="img-ruth"
+                />
+              </div>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      {/* Dates Section */}
+      <section className="py-24 md:py-32 lg:py-40 px-6 bg-background">
+        <div className="max-w-6xl mx-auto text-center">
+          <h2 className="text-4xl md:text-5xl lg:text-6xl font-serif font-light text-foreground mb-12 tracking-wide leading-tight">
+            HEUREUX DE VOUS
+            <br />
+            ACCUEILLIR PARMI NOUS
+          </h2>
+
+          <p className="text-sm md:text-base font-sans text-muted-foreground mb-16 italic max-w-2xl mx-auto">
+            Rejoignez-nous pour célébrer notre union lors de deux journées
+            inoubliables
+          </p>
+
+          <div className="mb-16">
+            <div
+              className="text-5xl md:text-7xl lg:text-8xl font-serif font-light text-primary mb-8"
+              data-testid="text-date-19"
+            >
+              19 & 21 MARS 2026
+            </div>
+
+            <div className="flex flex-col md:flex-row items-center justify-center gap-4 md:gap-8 text-sm md:text-base text-muted-foreground font-sans tracking-wide">
+              <span data-testid="card-date-19">• MARIAGE CIVIL & DOT</span>
+              <span className="hidden md:inline">|</span>
+              <span data-testid="card-date-21">• BÉNÉDICTION & RÉCEPTION</span>
+            </div>
+          </div>
+
+          <div className="max-w-4xl mx-auto border-t border-border pt-12">
+            <h3 className="text-lg md:text-xl font-sans font-light text-foreground mb-8 tracking-widest uppercase">
+              Compte à rebours
+            </h3>
+            <Countdown />
+          </div>
+        </div>
+      </section>
+
+      {/* RSVP Section */}
+      <section className="py-24 md:py-32 lg:py-40 px-6 bg-muted/30">
+        <div className="max-w-3xl mx-auto">
+          {!isSubmitted ? (
+            <>
+              <h2 className="text-3xl md:text-4xl font-serif font-light text-center mb-12 text-foreground tracking-wide">
+                CONFIRMEZ VOTRE PRÉSENCE
+              </h2>
+
+              <p className="text-sm md:text-base text-center text-muted-foreground font-sans mb-16 italic">
+                Merci de nous indiquer vos disponibilités afin de préparer nos
+                invitations officielles
+              </p>
+
+              <Card className="p-10 md:p-16">
+                <Form {...form}>
+                  <form
+                    onSubmit={form.handleSubmit(onSubmit)}
+                    className="space-y-8"
+                  >
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                      <FormField
+                        control={form.control}
+                        name="firstName"
+                        render={({ field }) => (
+                          <FormItem>
+                            <FormLabel className="text-base font-sans">
+                              Prénom *
+                            </FormLabel>
+                            <FormControl>
+                              <Input
+                                {...field}
+                                placeholder="Votre prénom"
+                                className="border-2 focus:border-primary transition-colors"
+                                data-testid="input-firstname"
+                              />
+                            </FormControl>
+                            <FormMessage />
+                          </FormItem>
+                        )}
+                      />
+
+                      <FormField
+                        control={form.control}
+                        name="lastName"
+                        render={({ field }) => (
+                          <FormItem>
+                            <FormLabel className="text-base font-sans">
+                              Nom *
+                            </FormLabel>
+                            <FormControl>
+                              <Input
+                                {...field}
+                                placeholder="Votre nom"
+                                className="border-2 focus:border-primary transition-colors"
+                                data-testid="input-lastname"
+                              />
+                            </FormControl>
+                            <FormMessage />
+                          </FormItem>
+                        )}
+                      />
+                    </div>
+
+                    <FormField
+                      control={form.control}
+                      name="email"
+                      render={({ field }) => (
+                        <FormItem>
+                          <FormLabel className="text-base font-sans">
+                            Adresse email *
+                          </FormLabel>
+                          <FormControl>
+                            <Input
+                              {...field}
+                              type="email"
+                              placeholder="votre@email.com"
+                              className="border-2 focus:border-primary transition-colors"
+                              data-testid="input-email"
+                            />
+                          </FormControl>
+                          <FormMessage />
+                        </FormItem>
+                      )}
+                    />
+
+                    <FormField
+                      control={form.control}
+                      name="partySize"
+                      render={({ field }) => (
+                        <FormItem>
+                          <FormLabel className="text-base font-sans">
+                            Nombre de personnes *
+                          </FormLabel>
+                          <FormControl>
+                            <Select
+                              onValueChange={(value) =>
+                                field.onChange(parseInt(value))
+                              }
+                              value={field.value?.toString()}
+                            >
+                              <SelectTrigger
+                                className="border-2 focus:border-primary transition-colors"
+                                data-testid="select-partysize"
+                              >
+                                <SelectValue placeholder="Sélectionnez" />
+                              </SelectTrigger>
+                              <SelectContent>
+                                <SelectItem value="1" data-testid="option-solo">
+                                  Solo (1 personne)
+                                </SelectItem>
+                                <SelectItem
+                                  value="2"
+                                  data-testid="option-couple"
+                                >
+                                  Couple (2 personnes)
+                                </SelectItem>
+                              </SelectContent>
+                            </Select>
+                          </FormControl>
+                          <FormMessage />
+                        </FormItem>
+                      )}
+                    />
+
+                    <FormField
+                      control={form.control}
+                      name="availability"
+                      render={({ field }) => (
+                        <FormItem>
+                          <FormLabel className="text-base font-sans">
+                            Disponibilité *
+                          </FormLabel>
+                          <Select
+                            onValueChange={field.onChange}
+                            value={field.value}
+                          >
+                            <FormControl>
+                              <SelectTrigger
+                                className="border-2 focus:border-primary transition-colors"
+                                data-testid="select-availability"
+                              >
+                                <SelectValue placeholder="Sélectionnez votre disponibilité" />
+                              </SelectTrigger>
+                            </FormControl>
+                            <SelectContent>
+                              <SelectItem
+                                value="19-march"
+                                data-testid="option-19-march"
+                              >
+                                19 mars seulement
+                              </SelectItem>
+                              <SelectItem
+                                value="21-march"
+                                data-testid="option-21-march"
+                              >
+                                21 mars seulement
+                              </SelectItem>
+                              <SelectItem
+                                value="both"
+                                data-testid="option-both"
+                              >
+                                Les deux dates
+                              </SelectItem>
+                              <SelectItem
+                                value="unavailable"
+                                data-testid="option-unavailable"
+                              >
+                                Je ne serai pas disponible
+                              </SelectItem>
+                            </SelectContent>
+                          </Select>
+                          <FormMessage />
+                        </FormItem>
+                      )}
+                    />
+
+                    <Button
+                      type="submit"
+                      size="lg"
+                      className="w-full rounded-full text-base font-sans"
+                      disabled={rsvpMutation.isPending}
+                      data-testid="button-submit-rsvp"
+                    >
+                      {rsvpMutation.isPending
+                        ? "Envoi en cours..."
+                        : "Je confirme ma présence"}
+                    </Button>
+                  </form>
+                </Form>
+              </Card>
+            </>
+          ) : (
+            <div
+              id="rsvp-success"
+              className="text-center animate-in fade-in slide-in-from-bottom-4 duration-500"
+            >
+              <div className="inline-flex items-center justify-center w-20 h-20 rounded-full bg-chart-2/10 mb-6">
+                <svg
+                  className="w-10 h-10 text-chart-2"
+                  fill="none"
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  strokeWidth="2"
+                  viewBox="0 0 24 24"
+                  stroke="currentColor"
+                >
+                  <path d="M5 13l4 4L19 7" />
+                </svg>
+              </div>
+              <h3 className="text-2xl md:text-3xl font-serif font-bold text-card-foreground mb-4">
+                Merci !
+              </h3>
+              <p className="text-base md:text-lg text-muted-foreground font-sans mb-8">
+                Nous avons bien reçu votre réponse. À très bientôt pour célébrer
+                ensemble !
+              </p>
+              <Button
+                variant="outline"
+                onClick={() => setIsSubmitted(false)}
+                className="rounded-full"
+                data-testid="button-new-rsvp"
+              >
+                Ajouter une autre réponse
+              </Button>
+            </div>
+          )}
+        </div>
+      </section>
+
+      {/* Gallery Section */}
+      <section
+        id="galerie"
+        className="py-24 md:py-32 lg:py-40 px-6 bg-muted/30"
+      >
+        <div className="max-w-7xl mx-auto">
+          <h2 className="text-3xl md:text-4xl font-serif font-light text-center mb-16 text-foreground tracking-wide">
+            NOS MOMENTS PRÉCIEUX
+          </h2>
+
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 md:gap-6">
+            {galleryImages.map((image, idx) => (
+              <div
+                key={idx}
+                className="relative aspect-[3/4] overflow-hidden cursor-pointer group"
+                onClick={() => setLightboxImage(image)}
+                data-testid={`gallery-image-${idx}`}
+              >
+                <img
+                  src={image.src}
+                  alt={image.alt}
+                  className="w-full h-full object-cover transition-all duration-500 group-hover:scale-105 group-hover:brightness-110"
+                />
+                <div className="absolute inset-0 bg-black/0 group-hover:bg-black/10 transition-all duration-300" />
+              </div>
+            ))}
+          </div>
+        </div>
+      </section>
+
+      {/* Footer */}
+      <footer className="py-16 md:py-20 px-6 border-t border-border bg-background">
+        <div className="max-w-7xl mx-auto">
+          <div className="grid grid-cols-1 md:grid-cols-4 gap-12 mb-12">
+            <div>
+              <h3 className="text-xs font-sans tracking-widest uppercase text-foreground mb-6">
+                INFORMATIONS
+              </h3>
+              <div className="space-y-3">
+                <a
+                  href="mailto:contact@ar2k26.com"
+                  className="block text-sm text-muted-foreground hover:text-primary transition-colors font-sans"
+                  data-testid="link-contact-email"
+                >
+                  contact@ar2k26.com
+                </a>
+                <p className="text-sm text-muted-foreground font-sans">
+                  Paris, France
+                </p>
+              </div>
+            </div>
+
+            <div>
+              <h3 className="text-xs font-sans tracking-widest uppercase text-foreground mb-6">
+                DATES
+              </h3>
+              <div className="space-y-3">
+                <p className="text-sm text-muted-foreground font-sans">
+                  19 Mars 2026
+                </p>
+                <p className="text-sm text-muted-foreground font-sans">
+                  21 Mars 2026
+                </p>
+              </div>
+            </div>
+
+            <div>
+              <h3 className="text-xs font-sans tracking-widest uppercase text-foreground mb-6">
+                NAVIGATION
+              </h3>
+              <div className="space-y-3">
+                <button
+                  onClick={() =>
+                    document
+                      .getElementById("story")
+                      ?.scrollIntoView({ behavior: "smooth" })
+                  }
+                  className="block text-sm text-muted-foreground hover:text-primary transition-colors font-sans text-left"
+                  data-testid="button-footer-nav-story"
+                >
+                  Notre Histoire
+                </button>
+                <button
+                  onClick={() =>
+                    document
+                      .getElementById("galerie")
+                      ?.scrollIntoView({ behavior: "smooth" })
+                  }
+                  className="block text-sm text-muted-foreground hover:text-primary transition-colors font-sans text-left"
+                  data-testid="button-footer-nav-gallery"
+                >
+                  Galerie
+                </button>
+              </div>
+            </div>
+
+            <div>
+              <h3 className="text-xs font-sans tracking-widest uppercase text-foreground mb-6">
+                GOLDEN LOVE
+              </h3>
+              <p className="text-sm text-muted-foreground font-sans italic">
+                Deux dates, un seul amour
+              </p>
+            </div>
+          </div>
+
+          <div className="pt-8 border-t border-border text-center">
+            <p className="text-xs text-muted-foreground font-sans tracking-wide">
+              © 2026 Ruth & Arnold. Tous droits réservés.
+            </p>
+          </div>
+        </div>
+      </footer>
+
+      {/* Lightbox */}
+      {lightboxImage && (
+        <Lightbox
+          src={lightboxImage.src}
+          alt={lightboxImage.alt}
+          photoId={lightboxImage.id}
+          onClose={() => setLightboxImage(null)}
+        />
+      )}
+    </div>
+  );
+}
