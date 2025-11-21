@@ -1,7 +1,6 @@
 import { useEffect, useState, useRef } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { LogOut, Search, Users, Table2, Download, Mail, Edit, Trash2, BarChart3, FileText } from "lucide-react";
-import { DashboardWidgets } from "@/components/dashboard-widgets";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
@@ -305,9 +304,6 @@ export default function Admin() {
       </header>
 
       <div className="container px-6 py-8">
-        {/* Dashboard Widgets */}
-        <DashboardWidgets responses={responses} />
-
         {/* Actions & Filters */}
         <Card className="p-6 mb-8 mt-8">
           <div className="flex flex-col gap-4">
