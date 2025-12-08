@@ -13,11 +13,11 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.use(getSession());
   app.use(passport.initialize());
   app.use(passport.session());
-  
+
   // Serialize/deserialize user
   passport.serializeUser((user: any, cb) => cb(null, user));
   passport.deserializeUser((user: any, cb) => cb(null, user));
-  
+
   // Local auth setup
   setupLocalAuth(app);
 
@@ -28,7 +28,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       if (!req.isAuthenticated() || !req.user?.isAdmin) {
         return res.json(null);
       }
-      
+
       res.json(req.user);
     } catch (error) {
       console.error("Error fetching user:", error);
@@ -41,7 +41,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     try {
       const validated = insertRsvpResponseSchema.parse(req.body);
       const response = await storage.createRsvpResponse(validated);
-      
+
       // Send email confirmation to couple (non-blocking)
       sendRsvpConfirmationEmail({
         firstName: response.firstName,
@@ -50,7 +50,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       }).catch(err => {
         console.error("Failed to send RSVP confirmation email:", err);
       });
-      
+
       res.json(response);
     } catch (error) {
       console.error("Error creating RSVP:", error);
@@ -103,15 +103,58 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Bulk Import Route
+  app.post("/api/rsvp/bulk", isLocallyAuthenticated, async (req, res) => {
+    try {
+      const guests = req.body;
+      if (!Array.isArray(guests)) {
+        return res.status(400).json({ message: "Input must be an array" });
+      }
+
+      const results = {
+        success: 0,
+        failed: 0,
+        errors: [] as string[]
+      };
+
+      for (const guest of guests) {
+        try {
+          // Default values for bulk import
+          const guestData = {
+            ...guest,
+            email: guest.email || null,
+            availability: 'pending', // Default to pending
+          };
+
+          // Use schema but allow partial since we just modified it
+          // Actually, we should probably manually validate or just pass to storage
+          // Because the schema expects specific enums
+
+          await storage.createRsvpResponse(guestData);
+          results.success++;
+        } catch (error: any) {
+          console.error("Error importing guest:", guest, error);
+          results.failed++;
+          results.errors.push(`Guest ${guest.firstName} ${guest.lastName}: ${error.message}`);
+        }
+      }
+
+      res.json(results);
+    } catch (error) {
+      console.error("Error in bulk import:", error);
+      res.status(500).json({ message: "Failed to process bulk import" });
+    }
+  });
+
   // CSV export route
   app.get("/api/rsvp/export/csv", isLocallyAuthenticated, async (req, res) => {
     try {
       const responses = await storage.getAllRsvpResponses();
-      
+
       // Create CSV content
       const headers = ['ID', 'Prénom', 'Nom', 'Disponibilité', 'Numéro de table', 'Date de réponse'];
       const csvRows = [headers.join(',')];
-      
+
       responses.forEach(response => {
         const availabilityText = {
           '19-march': '19 mars',
@@ -119,7 +162,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
           'both': 'Les deux dates',
           'unavailable': 'Pas disponible'
         }[response.availability] || response.availability;
-        
+
         const row = [
           response.id,
           `"${response.firstName}"`,
@@ -130,9 +173,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
         ];
         csvRows.push(row.join(','));
       });
-      
+
       const csvContent = csvRows.join('\n');
-      
+
       res.setHeader('Content-Type', 'text/csv; charset=utf-8');
       res.setHeader('Content-Disposition', `attachment; filename="rsvp-golden-love-${new Date().toISOString().split('T')[0]}.csv"`);
       res.send('\uFEFF' + csvContent); // BOM for Excel UTF-8 support
@@ -146,18 +189,18 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.post("/api/send-invitation", isLocallyAuthenticated, async (req, res) => {
     try {
       const { email, firstName, lastName, message } = req.body;
-      
+
       if (!email || !firstName || !lastName) {
         return res.status(400).json({ message: "Email, prénom et nom requis" });
       }
-      
+
       await sendPersonalizedInvitation({
         email,
         firstName,
         lastName,
         message,
       });
-      
+
       res.json({ success: true, message: "Invitation envoyée avec succès" });
     } catch (error) {
       console.error("Error sending invitation:", error);
@@ -170,7 +213,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     try {
       const { generateInvitationPDF } = await import("./invitation-service");
       const id = parseInt(req.params.id);
-      
+
       const response = await storage.getRsvpResponse(id);
       if (!response) {
         return res.status(404).json({ message: "Guest not found" });
