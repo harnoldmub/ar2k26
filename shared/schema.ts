@@ -44,9 +44,9 @@ export const rsvpResponses = pgTable("rsvp_responses", {
   id: integer("id").primaryKey().generatedAlwaysAsIdentity(),
   firstName: varchar("first_name", { length: 100 }).notNull(),
   lastName: varchar("last_name", { length: 100 }).notNull(),
-  email: varchar("email", { length: 255 }).notNull(),
+  email: varchar("email", { length: 255 }),
   partySize: integer("party_size").notNull().default(1), // 1 for Solo, 2 for Couple
-  availability: varchar("availability", { length: 50 }).notNull(), // '19-march', '21-march', 'both', 'unavailable'
+  availability: varchar("availability", { length: 50 }).notNull().default('pending'), // '19-march', '21-march', 'both', 'unavailable', 'pending'
   tableNumber: integer("table_number"), // For seat assignment
   notes: text("notes"),
   createdAt: timestamp("created_at").defaultNow(),
@@ -55,9 +55,9 @@ export const rsvpResponses = pgTable("rsvp_responses", {
 export const insertRsvpResponseSchema = z.object({
   firstName: z.string().min(1, "Le prénom est requis"),
   lastName: z.string().min(1, "Le nom est requis"),
-  email: z.string().email("Veuillez entrer une adresse email valide"),
+  email: z.string().email("Veuillez entrer une adresse email valide").optional().or(z.literal('')),
   partySize: z.number().int().min(1).max(2, "Sélectionnez Solo (1) ou Couple (2)"),
-  availability: z.enum(['19-march', '21-march', 'both', 'unavailable'], {
+  availability: z.enum(['19-march', '21-march', 'both', 'unavailable', 'pending'], {
     errorMap: () => ({ message: "Veuillez sélectionner une option" })
   }),
 });
@@ -65,9 +65,9 @@ export const insertRsvpResponseSchema = z.object({
 export const updateRsvpResponseSchema = z.object({
   firstName: z.string().min(1, "Le prénom est requis"),
   lastName: z.string().min(1, "Le nom est requis"),
-  email: z.string().email("Veuillez entrer une adresse email valide"),
+  email: z.string().email("Veuillez entrer une adresse email valide").nullable().optional().or(z.literal('')),
   partySize: z.number().int().min(1).max(2, "Sélectionnez Solo (1) ou Couple (2)"),
-  availability: z.enum(['19-march', '21-march', 'both', 'unavailable'], {
+  availability: z.enum(['19-march', '21-march', 'both', 'unavailable', 'pending'], {
     errorMap: () => ({ message: "Veuillez sélectionner une option" })
   }),
   tableNumber: z.number().int().positive().nullable().optional(),

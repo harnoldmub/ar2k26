@@ -26,6 +26,7 @@ export function DashboardWidgets({ responses }: DashboardWidgetsProps) {
     march19: responses.filter((r) => r.availability === "19-march").length,
     march21: responses.filter((r) => r.availability === "21-march").length,
     unavailable: responses.filter((r) => r.availability === "unavailable").length,
+    pending: responses.filter((r) => r.availability === "pending").length,
     assigned: responses.filter((r) => r.tableNumber !== null).length,
     totalGuests: responses.reduce((sum, r) => sum + r.partySize, 0),
     solo: responses.filter((r) => r.partySize === 1).length,
@@ -37,6 +38,7 @@ export function DashboardWidgets({ responses }: DashboardWidgetsProps) {
     { name: "19 mars", value: stats.march19, color: "hsl(var(--chart-2))" },
     { name: "21 mars", value: stats.march21, color: "hsl(var(--chart-3))" },
     { name: "Indisponibles", value: stats.unavailable, color: "hsl(var(--muted-foreground))" },
+    { name: "En attente", value: stats.pending, color: "hsl(var(--chart-4))" },
   ];
 
   const partySizeData = [
@@ -57,8 +59,8 @@ export function DashboardWidgets({ responses }: DashboardWidgetsProps) {
     },
   ];
 
-  const confirmationRate = stats.total > 0 
-    ? Math.round(((stats.total - stats.unavailable) / stats.total) * 100) 
+  const confirmationRate = stats.total > 0
+    ? Math.round(((stats.total - stats.unavailable) / stats.total) * 100)
     : 0;
 
   const statCards = [
@@ -116,7 +118,7 @@ export function DashboardWidgets({ responses }: DashboardWidgetsProps) {
                   <p className="text-sm font-sans text-muted-foreground mb-1">
                     {stat.title}
                   </p>
-                  <p 
+                  <p
                     className="text-3xl font-bold font-serif text-foreground mb-1"
                     data-testid={stat.testId}
                   >
@@ -133,6 +135,97 @@ export function DashboardWidgets({ responses }: DashboardWidgetsProps) {
             </Card>
           );
         })}
+      </div>
+
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+        <Card className="p-6 col-span-1">
+          <div className="flex items-center gap-2 mb-6">
+            <div className="p-2 rounded-lg bg-primary/10">
+              <TrendingUp className="h-5 w-5 text-primary" />
+            </div>
+            <h3 className="font-serif font-semibold text-lg">Répartition Disponibilité</h3>
+          </div>
+          <div className="h-[250px] w-full">
+            <ResponsiveContainer width="100%" height="100%">
+              <PieChart>
+                <Pie
+                  data={availabilityData}
+                  cx="50%"
+                  cy="50%"
+                  innerRadius={60}
+                  outerRadius={80}
+                  paddingAngle={5}
+                  dataKey="value"
+                >
+                  {availabilityData.map((entry, index) => (
+                    <Cell key={`cell-${index}`} fill={entry.color} />
+                  ))}
+                </Pie>
+                <Tooltip />
+                <Legend verticalAlign="bottom" height={36} />
+              </PieChart>
+            </ResponsiveContainer>
+          </div>
+        </Card>
+
+        <Card className="p-6 col-span-1">
+          <div className="flex items-center gap-2 mb-6">
+            <div className="p-2 rounded-lg bg-chart-4/10">
+              <Users className="h-5 w-5 text-chart-4" />
+            </div>
+            <h3 className="font-serif font-semibold text-lg">Taille des groupes</h3>
+          </div>
+          <div className="h-[250px] w-full">
+            <ResponsiveContainer width="100%" height="100%">
+              <BarChart data={partySizeData}>
+                <CartesianGrid strokeDasharray="3 3" vertical={false} />
+                <XAxis dataKey="name" fontSize={12} tickLine={false} axisLine={false} />
+                <YAxis fontSize={12} tickLine={false} axisLine={false} />
+                <Tooltip
+                  cursor={{ fill: 'transparent' }}
+                  contentStyle={{ borderRadius: '8px', border: 'none', boxShadow: '0 4px 6px -1px rgb(0 0 0 / 0.1)' }}
+                />
+                <Bar dataKey="value" radius={[4, 4, 0, 0]}>
+                  {partySizeData.map((entry, index) => (
+                    <Cell key={`cell-${index}`} fill={entry.fill} />
+                  ))}
+                </Bar>
+              </BarChart>
+            </ResponsiveContainer>
+          </div>
+        </Card>
+
+        <Card className="p-6 col-span-1">
+          <div className="flex items-center gap-2 mb-6">
+            <div className="p-2 rounded-lg bg-chart-2/10">
+              <Table2 className="h-5 w-5 text-chart-2" />
+            </div>
+            <h3 className="font-serif font-semibold text-lg">Plan de table</h3>
+          </div>
+          <div className="h-[250px] w-full">
+            <ResponsiveContainer width="100%" height="100%">
+              <PieChart>
+                <Pie
+                  data={tableAssignmentData}
+                  cx="50%"
+                  cy="50%"
+                  startAngle={180}
+                  endAngle={0}
+                  innerRadius={60}
+                  outerRadius={80}
+                  paddingAngle={5}
+                  dataKey="value"
+                >
+                  {tableAssignmentData.map((entry, index) => (
+                    <Cell key={`cell-${index}`} fill={entry.fill} />
+                  ))}
+                </Pie>
+                <Tooltip />
+                <Legend verticalAlign="bottom" height={36} />
+              </PieChart>
+            </ResponsiveContainer>
+          </div>
+        </Card>
       </div>
     </div>
   );

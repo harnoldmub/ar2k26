@@ -38,6 +38,8 @@ import {
   type InsertRsvpResponse,
 } from "@shared/schema";
 import { apiRequest, queryClient } from "@/lib/queryClient";
+import { AccommodationSection } from "@/components/accommodation";
+import { motion, useScroll, useTransform } from "framer-motion";
 import heroImage from "@assets/IMG_6360_1760648841327.jpg";
 import ruthPortrait from "@assets/ar-gallery_1760648320766.png";
 import arnoldPortrait from "@assets/rk-gallery_1760648320767.png";
@@ -319,10 +321,18 @@ export default function Landing() {
     <div className="min-h-screen bg-background">
       {/* Hero Section */}
       <section className="relative min-h-screen flex items-center justify-center overflow-hidden bg-background">
-        <div
+        <motion.div
           className="absolute inset-0 bg-cover bg-center opacity-20"
           style={{
             backgroundImage: `url(${heroImage})`,
+          }}
+          initial={{ scale: 1 }}
+          animate={{ scale: 1.1 }}
+          transition={{
+            duration: 20,
+            repeat: Infinity,
+            repeatType: "reverse",
+            ease: "easeInOut",
           }}
         />
         <div className="absolute inset-0 bg-gradient-to-b from-white/5 via-white/10 to-background/80" />
@@ -521,6 +531,9 @@ export default function Landing() {
           </div>
         </div>
       </section>
+
+      {/* Accommodation Section */}
+      <AccommodationSection />
 
       {/* RSVP Section */}
       <section className="py-24 md:py-32 lg:py-40 px-6 bg-muted/30">
