@@ -15,7 +15,8 @@ import {
 } from "@/components/ui/form";
 import { Input } from "@/components/ui/input";
 import { useToast } from "@/hooks/use-toast";
-import { Heart } from "lucide-react";
+import { queryClient } from "@/lib/queryClient";
+import logoRA from "@assets/logo-ra.png";
 
 const loginSchema = z.object({
   username: z.string().min(1, "L'identifiant est requis"),
@@ -49,6 +50,9 @@ export default function Login() {
       });
 
       if (response.ok) {
+        // Invalidate auth query to trigger re-fetch and redirect
+        queryClient.invalidateQueries({ queryKey: ["/api/auth/user"] });
+
         toast({
           title: "Connexion réussie",
           description: "Redirection vers le dashboard...",
@@ -79,8 +83,12 @@ export default function Login() {
     <div className="min-h-screen bg-background flex items-center justify-center p-6">
       <Card className="w-full max-w-md p-8">
         <div className="text-center mb-8">
-          <div className="inline-flex items-center justify-center w-16 h-16 rounded-full bg-primary/10 mb-4">
-            <Heart className="w-8 h-8 text-primary" />
+          <div className="flex items-center justify-center mb-4">
+            <img
+              src={logoRA}
+              alt="R&A Logo"
+              className="h-16 w-auto"
+            />
           </div>
           <h1 className="text-2xl font-serif font-light text-foreground mb-2">
             Administration

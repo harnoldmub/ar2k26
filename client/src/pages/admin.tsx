@@ -1,6 +1,6 @@
 import { useEffect, useState, useRef } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
-import { LogOut, Search, Users, Table2, Download, Mail, Edit, Trash2, BarChart3, FileText, Plus, ArrowUp, ArrowDown, X, TrendingUp } from "lucide-react";
+import { LogOut, Search, Users, Table2, Download, Mail, Edit, Trash2, BarChart3, FileText, Plus, ArrowUp, ArrowDown, X, TrendingUp, ExternalLink, Eye } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
@@ -36,6 +36,7 @@ import { apiRequest, queryClient } from "@/lib/queryClient";
 import { isUnauthorizedError } from "@/lib/authUtils";
 import { DashboardWidgets } from "@/components/dashboard-widgets";
 import type { RsvpResponse } from "@shared/schema";
+import logoRA from "@assets/logo-ra.png";
 
 const ImportGuestForm = ({ onSuccess }: { onSuccess: () => void }) => {
   const [text, setText] = useState("");
@@ -272,7 +273,7 @@ export default function Admin() {
   });
 
   const updateRsvpMutation = useMutation({
-    mutationFn: async ({ id, data }: { id: number; data: Omit<RsvpResponse, 'id' | 'createdAt'> }) => {
+    mutationFn: async ({ id, data }: { id: number; data: Partial<Omit<RsvpResponse, 'id' | 'createdAt'>> }) => {
       return await apiRequest("PUT", `/api/rsvp/${id}`, data);
     },
     onSuccess: () => {
@@ -332,6 +333,74 @@ export default function Admin() {
       });
     },
   });
+
+  const bulkConfirmMutation = useMutation({
+    mutationFn: async (ids: number[]) => {
+      return await apiRequest("POST", "/api/rsvp/bulk-confirm", { ids });
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/rsvp"] });
+      toast({
+        title: "Succès",
+        description: "Les invités sélectionnés ont été confirmés.",
+      });
+      setSelectedIds([]);
+    },
+    onError: () => {
+      toast({
+        title: "Erreur",
+        description: "Échec de la confirmation groupée.",
+        variant: "destructive",
+      });
+    },
+  });
+
+  const whatsappMutation = useMutation({
+    mutationFn: async (id: number) => {
+      const response = await apiRequest("POST", `/api/rsvp/${id}/whatsapp-log`);
+      return await response.json();
+    },
+    onSuccess: (data: any, variables: number) => {
+      console.log("WhatsApp API response:", data); // Debug log
+      if (!data.phone) {
+        toast({
+          title: "Numéro manquant",
+          description: "Cet invité n'a pas de numéro de téléphone enregistré.",
+          variant: "destructive"
+        });
+        return;
+      }
+
+      const message = `Bonjour,\nVous êtes invité à Golden Love 2026.\nVoici votre invitation et pass d'accès : ${window.location.origin}/invitation/${variables}`;
+      // Encode and open
+      const url = `https://wa.me/${data.phone.replace(/[^0-9]/g, '')}?text=${encodeURIComponent(message)}`;
+      window.open(url, '_blank');
+
+      queryClient.invalidateQueries({ queryKey: ["/api/rsvp"] });
+      toast({ title: "WhatsApp", description: "WhatsApp ouvert !" });
+    },
+    onError: () => {
+      toast({ title: "Erreur", description: "Impossible de préparer WhatsApp", variant: "destructive" });
+    }
+  });
+
+  const [selectedIds, setSelectedIds] = useState<number[]>([]);
+
+  const toggleSelectAll = () => {
+    if (selectedIds.length === filteredResponses.length) {
+      setSelectedIds([]);
+    } else {
+      setSelectedIds(filteredResponses.map(r => r.id));
+    }
+  };
+
+  const toggleSelect = (id: number) => {
+    if (selectedIds.includes(id)) {
+      setSelectedIds(selectedIds.filter(i => i !== id));
+    } else {
+      setSelectedIds([...selectedIds, id]);
+    }
+  };
 
   const handleExportCSV = () => {
     window.open('/api/rsvp/export/csv', '_blank');
@@ -400,11 +469,13 @@ export default function Admin() {
     <div className="min-h-screen bg-background">
       {/* Header */}
       <header className="sticky top-0 z-40 border-b bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60">
-        <div className="container flex h-16 items-center justify-between px-6">
+        <div className="container mx-auto flex h-16 items-center justify-between px-6">
           <div className="flex items-center gap-3">
-            <div className="p-2 rounded-lg bg-primary/10">
-              <Users className="h-6 w-6 text-primary" />
-            </div>
+            <img
+              src={logoRA}
+              alt="R&A Logo"
+              className="h-10 w-auto"
+            />
             <div>
               <h1 className="text-xl font-serif font-bold text-foreground">
                 Espace Administrateur
@@ -425,7 +496,7 @@ export default function Admin() {
         </div>
       </header>
 
-      <div className="container px-6 py-8">
+      <div className="container mx-auto px-6 py-8">
         {/* Dashboard Sections */}
         <div className="space-y-8">
           <DashboardWidgets responses={responses} />
@@ -455,7 +526,6 @@ export default function Admin() {
                       </DialogHeader>
                       <ImportGuestForm onSuccess={() => {
                         queryClient.invalidateQueries({ queryKey: ["/api/rsvp"] });
-                        // setInviteDialogOpen(false); // Close dialog if it shares state? No, own state.
                       }} />
                     </DialogContent>
                   </Dialog>
@@ -469,6 +539,18 @@ export default function Admin() {
                     <Download className="h-4 w-4 mr-2" />
                     Exporter CSV
                   </Button>
+
+                  {selectedIds.length > 0 && (
+                    <Button
+                      variant="default"
+                      className="bg-green-600 hover:bg-green-700 text-white"
+                      onClick={() => bulkConfirmMutation.mutate(selectedIds)}
+                      disabled={bulkConfirmMutation.isPending}
+                    >
+                      <Users className="h-4 w-4 mr-2" />
+                      Confirmer ({selectedIds.length})
+                    </Button>
+                  )}
 
                   <Dialog open={inviteDialogOpen} onOpenChange={setInviteDialogOpen}>
                     <DialogTrigger asChild>
@@ -582,6 +664,15 @@ export default function Admin() {
               <Table>
                 <TableHeader>
                   <TableRow>
+                    <TableHead className="w-[50px]">
+                      <input
+                        type="checkbox"
+                        checked={filteredResponses.length > 0 && selectedIds.length === filteredResponses.length}
+                        onChange={toggleSelectAll}
+                        className="translate-y-[2px]"
+                      />
+                    </TableHead>
+                    <TableHead className="font-sans">Statut</TableHead>
                     <TableHead
                       className="font-sans cursor-pointer hover:bg-muted/50 transition-colors"
                       onClick={() => {
@@ -688,7 +779,22 @@ export default function Admin() {
                         return sortConfig.direction === 'asc' ? comparison : -comparison;
                       })
                       .map((response) => (
-                        <TableRow key={response.id} data-testid={`row-guest-${response.id}`}>
+                        <TableRow key={response.id} data-testid={`row-guest-${response.id}`} className={selectedIds.includes(response.id) ? "bg-muted/50" : ""}>
+                          <TableCell>
+                            <input
+                              type="checkbox"
+                              checked={selectedIds.includes(response.id)}
+                              onChange={() => toggleSelect(response.id)}
+                            />
+                          </TableCell>
+                          <TableCell>
+                            <span className={`inline-flex items-center px-2 py-1 rounded-full text-xs font-medium border ${response.status === 'confirmed'
+                              ? 'bg-green-100 text-green-800 border-green-200'
+                              : 'bg-gray-100 text-gray-800 border-gray-200'
+                              }`}>
+                              {response.status === 'confirmed' ? 'Confirmé' : 'En attente'}
+                            </span>
+                          </TableCell>
                           <TableCell className="font-sans font-medium">{response.firstName}</TableCell>
                           <TableCell className="font-sans font-medium">{response.lastName}</TableCell>
                           <TableCell className="font-sans text-sm text-muted-foreground" data-testid={`text-email-${response.id}`}>
@@ -803,36 +909,54 @@ export default function Admin() {
                             <div className="flex items-center gap-1">
                               <Button
                                 variant="ghost"
+                                size="sm"
+                                onClick={() => {
+                                  setInviteEmail(response.email || "");
+                                  setInviteFirstName(response.firstName);
+                                  setInviteLastName(response.lastName);
+                                  setInviteDialogOpen(true);
+                                }}
+                                title="Envoyer Email"
+                              >
+                                <Mail className="h-4 w-4" />
+                              </Button>
+                              {response.phone && (
+                                <Button
+                                  variant="ghost"
+                                  size="sm"
+                                  onClick={() => whatsappMutation.mutate(response.id)}
+                                  className="text-green-600 hover:text-green-700 hover:bg-green-50"
+                                  title="Envoyer WhatsApp"
+                                >
+                                  <ExternalLink className="h-4 w-4" />
+                                </Button>
+                              )}
+                              <Button
+                                variant="ghost"
                                 size="icon"
-                                className="h-8 w-8 text-muted-foreground hover:text-foreground"
+                                onClick={() => window.open(`/invitation/${response.id}`, '_blank')}
+                                title="Voir l'invitation"
+                              >
+                                <Eye className="h-4 w-4" />
+                              </Button>
+                              <Button
+                                variant="ghost"
+                                size="sm"
                                 onClick={() => {
                                   setEditingResponse(response);
                                   setEditDialogOpen(true);
                                 }}
-                                data-testid={`button-edit-${response.id}`}
                               >
                                 <Edit className="h-4 w-4" />
                               </Button>
                               <Button
                                 variant="ghost"
-                                size="icon"
-                                className="h-8 w-8 text-muted-foreground hover:text-primary"
-                                onClick={() => generateInvitationMutation.mutate(response.id)}
-                                disabled={generateInvitationMutation.isPending}
-                                data-testid={`button-invitation-${response.id}`}
-                                title="Générer l'invitation"
-                              >
-                                <FileText className="h-4 w-4" />
-                              </Button>
-                              <Button
-                                variant="ghost"
-                                size="icon"
-                                className="h-8 w-8 text-muted-foreground hover:text-destructive"
+                                size="sm"
+                                className="text-destructive hover:text-destructive"
                                 onClick={() => {
                                   setDeletingId(response.id);
                                   setDeleteDialogOpen(true);
                                 }}
-                                data-testid={`button-delete-${response.id}`}
                               >
                                 <Trash2 className="h-4 w-4" />
                               </Button>
@@ -984,6 +1108,9 @@ export default function Admin() {
                       <SelectContent>
                         <SelectItem value="1">Solo (1 personne)</SelectItem>
                         <SelectItem value="2">Couple (2 personnes)</SelectItem>
+                        <SelectItem value="3">Groupe (3 personnes)</SelectItem>
+                        <SelectItem value="4">Groupe (4 personnes)</SelectItem>
+                        <SelectItem value="5">Groupe (5 personnes)</SelectItem>
                       </SelectContent>
                     </Select>
                   </div>
@@ -1004,6 +1131,16 @@ export default function Admin() {
                         <SelectItem value="pending">En attente</SelectItem>
                       </SelectContent>
                     </Select>
+                  </div>
+                  <div className="space-y-2">
+                    <Label htmlFor="edit-phone">Téléphone (pour WhatsApp)</Label>
+                    <Input
+                      id="edit-phone"
+                      placeholder="+33 6 12 34 56 78"
+                      value={editingResponse.phone ?? ''}
+                      onChange={(e) => setEditingResponse({ ...editingResponse, phone: e.target.value })}
+                      data-testid="input-edit-phone"
+                    />
                   </div>
                   <div className="space-y-2">
                     <Label htmlFor="edit-table">Numéro de table (optionnel)</Label>
@@ -1036,17 +1173,21 @@ export default function Admin() {
                 <Button
                   onClick={() => {
                     if (editingResponse) {
+                      // Create clean payload with only necessary fields
+                      const payload = {
+                        firstName: editingResponse.firstName,
+                        lastName: editingResponse.lastName,
+                        email: editingResponse.email ?? null,
+                        phone: editingResponse.phone ?? null,
+                        partySize: editingResponse.partySize,
+                        availability: editingResponse.availability,
+                        status: editingResponse.status ?? 'pending',
+                        tableNumber: editingResponse.tableNumber ?? null,
+                        notes: editingResponse.notes ?? null,
+                      };
                       updateRsvpMutation.mutate({
                         id: editingResponse.id,
-                        data: {
-                          firstName: editingResponse.firstName,
-                          lastName: editingResponse.lastName,
-                          email: editingResponse.email,
-                          partySize: editingResponse.partySize,
-                          availability: editingResponse.availability,
-                          tableNumber: editingResponse.tableNumber,
-                          notes: editingResponse.notes,
-                        }
+                        data: payload
                       });
                     }
                   }}

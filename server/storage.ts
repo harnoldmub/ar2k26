@@ -15,7 +15,7 @@ export interface IStorage {
   // User operations (IMPORTANT - mandatory for Replit Auth)
   getUser(id: string): Promise<User | undefined>;
   upsertUser(user: UpsertUser): Promise<User>;
-  
+
   // RSVP operations
   createRsvpResponse(response: InsertRsvpResponse): Promise<RsvpResponse>;
   getRsvpResponse(id: number): Promise<RsvpResponse | undefined>;
@@ -23,6 +23,7 @@ export interface IStorage {
   updateRsvpTableNumber(id: number, tableNumber: number | null): Promise<RsvpResponse>;
   deleteRsvpResponse(id: number): Promise<void>;
   updateRsvpResponse(id: number, response: UpdateRsvpResponse): Promise<RsvpResponse>;
+  getRsvpResponseByQrToken(token: string): Promise<RsvpResponse | undefined>;
 }
 
 export class DatabaseStorage implements IStorage {
@@ -37,7 +38,7 @@ export class DatabaseStorage implements IStorage {
     // - ID (sub) is the primary identity and source of truth
     // - Email can change for the same user
     // - If email collision occurs with different ID, clear that user's email first
-    
+
     return await db.transaction(async (tx) => {
       // If userData has an email, check for email conflicts with different IDs
       if (userData.email && userData.id) {
@@ -52,7 +53,7 @@ export class DatabaseStorage implements IStorage {
             )
           );
       }
-      
+
       // Now safely upsert by ID (primary key)
       const [user] = await tx
         .insert(users)
@@ -65,7 +66,7 @@ export class DatabaseStorage implements IStorage {
           },
         })
         .returning();
-      
+
       return user;
     });
   }
@@ -87,6 +88,14 @@ export class DatabaseStorage implements IStorage {
     return response;
   }
 
+  async getRsvpResponseByQrToken(token: string): Promise<RsvpResponse | undefined> {
+    const [response] = await db
+      .select()
+      .from(rsvpResponses)
+      .where(eq(rsvpResponses.qrToken, token));
+    return response;
+  }
+
   async getAllRsvpResponses(): Promise<RsvpResponse[]> {
     return await db.select().from(rsvpResponses);
   }
@@ -105,9 +114,10 @@ export class DatabaseStorage implements IStorage {
   }
 
   async updateRsvpResponse(id: number, responseData: UpdateRsvpResponse): Promise<RsvpResponse> {
+    const { id: _, ...dataToUpdate } = responseData as any; // Safer cast to avoid type issues if ID is present
     const [response] = await db
       .update(rsvpResponses)
-      .set(responseData)
+      .set(dataToUpdate)
       .where(eq(rsvpResponses.id, id))
       .returning();
     return response;

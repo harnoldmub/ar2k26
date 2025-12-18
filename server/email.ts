@@ -4,11 +4,11 @@ let connectionSettings: any;
 
 async function getCredentials() {
   const hostname = process.env.REPLIT_CONNECTORS_HOSTNAME
-  const xReplitToken = process.env.REPL_IDENTITY 
-    ? 'repl ' + process.env.REPL_IDENTITY 
-    : process.env.WEB_REPL_RENEWAL 
-    ? 'depl ' + process.env.WEB_REPL_RENEWAL 
-    : null;
+  const xReplitToken = process.env.REPL_IDENTITY
+    ? 'repl ' + process.env.REPL_IDENTITY
+    : process.env.WEB_REPL_RENEWAL
+      ? 'depl ' + process.env.WEB_REPL_RENEWAL
+      : null;
 
   if (!xReplitToken) {
     throw new Error('X_REPLIT_TOKEN not found for repl/depl');
@@ -27,7 +27,7 @@ async function getCredentials() {
   if (!connectionSettings || (!connectionSettings.settings.api_key)) {
     throw new Error('Resend not connected');
   }
-  return {apiKey: connectionSettings.settings.api_key, fromEmail: connectionSettings.settings.from_email};
+  return { apiKey: connectionSettings.settings.api_key, fromEmail: connectionSettings.settings.from_email };
 }
 
 // WARNING: Never cache this client.
@@ -48,7 +48,7 @@ export async function sendRsvpConfirmationEmail(guestData: {
 }) {
   try {
     const { client, fromEmail } = await getUncachableResendClient();
-    
+
     const availabilityText = {
       '19-march': '19 mars uniquement (Mariage civil + Fête de la Dot)',
       '21-march': '21 mars uniquement (Bénédiction nuptiale + Grande fête)',
@@ -111,13 +111,13 @@ export async function sendRsvpConfirmationEmail(guestData: {
             <div class="info-box">
               <p><strong>Invité :</strong> ${guestData.firstName} ${guestData.lastName}</p>
               <p><strong>Disponibilité :</strong> ${availabilityText}</p>
-              <p><strong>Date de réponse :</strong> ${new Date().toLocaleDateString('fr-FR', { 
-                year: 'numeric', 
-                month: 'long', 
-                day: 'numeric',
-                hour: '2-digit',
-                minute: '2-digit'
-              })}</p>
+              <p><strong>Date de réponse :</strong> ${new Date().toLocaleDateString('fr-FR', {
+      year: 'numeric',
+      month: 'long',
+      day: 'numeric',
+      hour: '2-digit',
+      minute: '2-digit'
+    })}</p>
             </div>
             
             <p>Vous pouvez gérer les attributions de tables dans votre espace administrateur.</p>
@@ -156,12 +156,18 @@ export async function sendPersonalizedInvitation(recipientData: {
   firstName: string;
   lastName: string;
   message?: string;
+  qrToken?: string;
 }) {
   try {
     const { client, fromEmail } = await getUncachableResendClient();
-    
+
     const customMessage = recipientData.message || `Nous serions honorés de votre présence à notre mariage.`;
-    
+
+    // Determine domain (use window.location.origin in frontend, here we need env or default)
+    // For local dev assuming localhost:5000 or similar if accessible, otherwise user config
+    const domain = process.env.REPLIT_DEV_DOMAIN ? `https://${process.env.REPLIT_DEV_DOMAIN}` : 'http://localhost:3000';
+    const link = recipientData.qrToken ? `${domain}/checkin?token=${recipientData.qrToken}` : `${domain}/invitation/viewer`; // Fallback
+
     const emailHtml = `
       <!DOCTYPE html>
       <html>
@@ -280,11 +286,11 @@ export async function sendPersonalizedInvitation(recipientData: {
             </div>
             
             <div style="text-align: center; margin: 30px 0;">
-              <a href="${process.env.REPLIT_DEV_DOMAIN ? `https://${process.env.REPLIT_DEV_DOMAIN}` : 'https://votre-site.replit.app'}" 
-                 class="cta-button">
-                Confirmer votre présence
+              <a href="${link}" class="cta-button">
+                 ${recipientData.qrToken ? 'Accéder à mon Pass / QR Code' : 'Voir les détails'}
               </a>
             </div>
+
             
             <p style="margin-top: 25px;">
               Nous attendons votre réponse avec impatience !

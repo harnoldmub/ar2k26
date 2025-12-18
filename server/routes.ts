@@ -1,5 +1,6 @@
 import type { Express } from "express";
 import { createServer, type Server } from "http";
+import crypto from "crypto";
 import { storage } from "./storage";
 import { getSession } from "./replitAuth";
 import { setupLocalAuth, isLocallyAuthenticated } from "./localAuth";
@@ -94,12 +95,217 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.put("/api/rsvp/:id", isLocallyAuthenticated, async (req, res) => {
     try {
       const id = parseInt(req.params.id);
+      console.log("PUT /api/rsvp/:id - Request body:", JSON.stringify(req.body, null, 2));
       const validated = updateRsvpResponseSchema.parse(req.body);
+      console.log("PUT /api/rsvp/:id - Validated data:", JSON.stringify(validated, null, 2));
       const response = await storage.updateRsvpResponse(id, validated);
       res.json(response);
     } catch (error) {
       console.error("Error updating RSVP:", error);
-      res.status(400).json({ message: "Invalid request data" });
+      if (error instanceof Error) {
+        console.error("Error details:", error.message);
+        console.error("Error stack:", error.stack);
+      }
+      // If it's a Zod error, log the issues
+      if (error && typeof error === 'object' && 'issues' in error) {
+        console.error("Zod validation issues:", JSON.stringify((error as any).issues, null, 2));
+      }
+      res.status(400).json({
+        message: "Invalid request data",
+        error: error instanceof Error ? error.message : String(error),
+        details: error && typeof error === 'object' && 'issues' in error ? (error as any).issues : undefined
+      });
+    }
+  });
+  // Bulk Confirm Route
+  app.post("/api/rsvp/bulk-confirm", isLocallyAuthenticated, async (req, res) => {
+    try {
+      const { ids } = req.body;
+      if (!Array.isArray(ids)) {
+        return res.status(400).json({ message: "IDs list required" });
+      }
+
+      for (const id of ids) {
+        const guest = await storage.getRsvpResponse(id);
+        if (guest) {
+          // Update status and confirmedAt
+          await storage.updateRsvpResponse(id, {
+            firstName: guest.firstName,
+            lastName: guest.lastName,
+            partySize: guest.partySize,
+            availability: guest.availability,
+            status: 'confirmed',
+            confirmedAt: new Date()
+          } as any);
+        }
+      }
+      res.json({ success: true });
+    } catch (error) {
+      console.error("Error bulk confirming:", error);
+      res.status(500).json({ message: "Failed to confirm" });
+    }
+  });
+
+  // Check-in Route
+  app.get("/api/checkin", async (req, res) => {
+    try {
+      const { token } = req.query;
+      if (!token || typeof token !== 'string') {
+        return res.status(400).json({ message: "Token required" });
+      }
+
+      const guest = await storage.getRsvpResponseByQrToken(token);
+      if (!guest) {
+        return res.status(404).json({ message: "Invité non trouvé ou token invalide" });
+      }
+
+      res.json({
+        id: guest.id,
+        firstName: guest.firstName,
+        lastName: guest.lastName,
+        partySize: guest.partySize,
+        tableNumber: guest.tableNumber,
+        status: guest.status,
+        availability: guest.availability,
+        checkedInAt: guest.checkedInAt,
+        groupType: guest.partySize > 1 ? 'Couple' : 'Solo'
+      });
+    } catch (error) {
+      console.error("Check-in error:", error);
+      res.status(500).json({ message: "Server error" });
+    }
+  });
+
+  // Mark Guest as Checked In
+  app.post("/api/checkin/:id", async (req, res) => {
+    try {
+      const id = parseInt(req.params.id);
+      const guest = await storage.getRsvpResponse(id);
+      if (!guest) return res.status(404).json({ message: "Guest not found" });
+
+      await storage.updateRsvpResponse(id, {
+        ...guest,
+        checkedInAt: new Date(),
+        status: 'confirmed' // Ensure they are confirmed if checking in
+      } as any);
+
+      res.json({ success: true });
+    } catch (error) {
+      console.error("Check-in confirmation error:", error);
+      res.status(500).json({ message: "Error checking in" });
+    }
+  });
+
+  // Send Invitation (Email) - Specific Guest
+  app.post("/api/rsvp/:id/send-invitation", isLocallyAuthenticated, async (req, res) => {
+    try {
+      const id = parseInt(req.params.id);
+      let guest = await storage.getRsvpResponse(id);
+      if (!guest) return res.status(404).json({ message: "Guest not found" });
+
+      if (!guest.email) return res.status(400).json({ message: "Email missing for this guest" });
+
+      // Generate token if missing
+      let qrToken = guest.qrToken;
+      if (!qrToken) {
+        qrToken = crypto.randomUUID();
+        guest = await storage.updateRsvpResponse(id, {
+          ...guest,
+          qrToken
+        } as any);
+      }
+
+      // Send Email
+      if (!guest.email) {
+        // Should not happen as we checked before, but after update guest is refreshed
+        return res.status(400).json({ message: "Email missing" });
+      }
+
+      await sendPersonalizedInvitation({
+        email: guest.email,
+        firstName: guest.firstName,
+        lastName: guest.lastName,
+        qrToken: qrToken
+      });
+
+      // Update Timestamp
+      await storage.updateRsvpResponse(id, {
+        ...guest,
+        invitationSentAt: new Date()
+      } as any);
+
+      res.json({ success: true });
+    } catch (err) {
+      console.error(err);
+      res.status(500).json({ message: "Error sending invitation" });
+    }
+  });
+
+  // WhatsApp Log Route
+  app.post("/api/rsvp/:id/whatsapp-log", isLocallyAuthenticated, async (req, res) => {
+    try {
+      const id = parseInt(req.params.id);
+      let guest = await storage.getRsvpResponse(id);
+      if (!guest) return res.status(404).json({ message: "Guest not found" });
+
+      // Generate token if missing
+      let qrToken = guest.qrToken;
+      if (!qrToken) {
+        qrToken = crypto.randomUUID();
+        guest = await storage.updateRsvpResponse(id, {
+          ...guest,
+          qrToken
+        } as any);
+      }
+
+      // Update Timestamp
+      await storage.updateRsvpResponse(id, {
+        ...guest,
+        whatsappInvitationSentAt: new Date()
+      } as any);
+
+      res.json({
+        success: true,
+        phone: guest.phone,
+        qrToken
+      });
+    } catch (err) {
+      console.error(err);
+      res.status(500).json({ message: "Error logging WhatsApp" });
+    }
+  });
+
+  // Public Guest Lookup (for Invitation)
+  app.get("/api/guests/:id", async (req, res) => {
+    try {
+      const id = parseInt(req.params.id);
+      if (isNaN(id)) {
+        return res.status(400).json({ message: "Invalid ID" });
+      }
+
+      const response = await storage.getRsvpResponse(id);
+
+      // Check if guest exists
+      if (!response) {
+        return res.status(404).json({ message: "Invité non trouvé" });
+      }
+
+      // Check if table is assigned (Confirmation logic) - DISABLED per user request
+      /* if (!response.tableNumber) {
+        return res.status(403).json({ message: "Votre invitation est en cours de traitement. Veuillez réessayer plus tard." });
+      } */
+
+      // Return public info only
+      res.json({
+        firstName: response.firstName,
+        lastName: response.lastName,
+        tableNumber: response.tableNumber,
+        partySize: response.partySize,
+        availability: response.availability
+      });
+    } catch (error) {
+      console.error("Error fetching guest:", error);
+      res.status(500).json({ message: "Erreur serveur" });
     }
   });
 
@@ -125,10 +331,6 @@ export async function registerRoutes(app: Express): Promise<Server> {
             email: guest.email || null,
             availability: 'pending', // Default to pending
           };
-
-          // Use schema but allow partial since we just modified it
-          // Actually, we should probably manually validate or just pass to storage
-          // Because the schema expects specific enums
 
           await storage.createRsvpResponse(guestData);
           results.success++;
@@ -185,7 +387,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  // Send invitation email route
+  // Send invitation email route (Legacy or Generic)
   app.post("/api/send-invitation", isLocallyAuthenticated, async (req, res) => {
     try {
       const { email, firstName, lastName, message } = req.body;
@@ -213,6 +415,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     try {
       const { generateInvitationPDF } = await import("./invitation-service");
       const id = parseInt(req.params.id);
+      const type = req.query.type as '19' | '21' | undefined; // Get type from query
 
       const response = await storage.getRsvpResponse(id);
       if (!response) {
@@ -224,12 +427,13 @@ export async function registerRoutes(app: Express): Promise<Server> {
         firstName: response.firstName,
         lastName: response.lastName,
         tableNumber: response.tableNumber,
+        type // Pass to service
       });
 
       res.setHeader("Content-Type", "application/pdf");
       res.setHeader(
         "Content-Disposition",
-        `inline; filename="invitation-${response.firstName}-${response.lastName}.pdf"`
+        `inline; filename="invitation-${response.firstName}-${response.lastName}-${type || 'full'}.pdf"`
       );
       res.send(pdfBuffer);
     } catch (error) {
@@ -241,3 +445,4 @@ export async function registerRoutes(app: Express): Promise<Server> {
   const httpServer = createServer(app);
   return httpServer;
 }
+

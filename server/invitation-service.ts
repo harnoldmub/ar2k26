@@ -6,6 +6,7 @@ export interface InvitationData {
   firstName: string;
   lastName: string;
   tableNumber: number | null;
+  type?: '19' | '21';
 }
 
 export async function generateInvitationPDF(
@@ -27,7 +28,7 @@ export async function generateInvitationPDF(
           reject(e);
         }
       });
-      doc.on("error", (err) => reject(err));
+      doc.on("error", (err: any) => reject(err));
 
       // PAGE 1: Save the Date
       doc.fillColor("#f5f1e8").rect(0, 0, doc.page.width, doc.page.height).fill();
@@ -35,35 +36,27 @@ export async function generateInvitationPDF(
 
       const centerX = doc.page.width / 2;
 
-      doc
-        .font("Helvetica-Bold")
-        .fontSize(32)
-        .fillColor("#8b7355")
-        .text("SAVE", centerX - 20, 80, { width: 40, align: "center" });
-
-      doc
-        .font("Helvetica")
-        .fontSize(24)
-        .fillColor("#8b7355")
-        .text("the", centerX - 15, 125, { width: 30, align: "center" });
+      // Header Date
+      const dateText = data.type === '19' ? "19 MARS 2026" : data.type === '21' ? "21 MARS 2026" : "19 & 21 MARS 2026";
+      const titleText = data.type === '19' ? "DOT & TRADITION" : "MARIAGE";
 
       doc
         .font("Helvetica-Bold")
         .fontSize(32)
         .fillColor("#8b7355")
-        .text("DATE", centerX - 20, 160, { width: 40, align: "center" });
+        .text(titleText, 30, 80, { width: doc.page.width - 60, align: "center" });
 
       doc
         .font("Helvetica")
         .fontSize(14)
         .fillColor("#8b7355")
-        .text("19 & 21 MARS 2026", centerX - 50, 220, { width: 100, align: "center" });
+        .text(dateText, centerX - 50, 140, { width: 100, align: "center" });
 
       doc
         .font("Helvetica-Oblique")
         .fontSize(16)
         .fillColor("#8b7355")
-        .text("Ruth & Arnold", centerX - 40, 270, { width: 80, align: "center" });
+        .text("Ruth & Arnold", centerX - 40, 180, { width: 80, align: "center" });
 
       doc
         .font("Helvetica")
@@ -89,12 +82,31 @@ export async function generateInvitationPDF(
         .text("PROGRAMME", 30, 30, { width: doc.page.width - 60, align: "center" });
 
       let yPos = 55;
-      const programs = [
-        "19 MARS • Dot & Cérémonie",
-        "21 MARS • Civil - 10h",
-        "21 MARS • Bénédiction - 13h",
-        "21 MARS • Soirée - 20h",
-      ];
+      let programs: string[] = [];
+
+      if (data.type === '19') {
+        programs = [
+          "19h30 • Accueil",
+          "20h00 • Cérémonie de Dot",
+          "22h00 • Dîner",
+        ];
+      } else if (data.type === '21') {
+        programs = [
+          "10h00 • Cérémonie Civile",
+          "12h00 • Bénédiction Nuptiale",
+          "15h00 • Photos & Cocktail",
+          "19h00 • Réception & Dîner",
+          "22h00 • Soirée Dansante"
+        ];
+      } else {
+        // Fallback or combined
+        programs = [
+          "19 MARS • Dot & Cérémonie",
+          "21 MARS • Civil - 10h",
+          "21 MARS • Bénédiction - 12h",
+          "21 MARS • Soirée - 19h",
+        ];
+      }
 
       programs.forEach((prog) => {
         doc
@@ -105,15 +117,22 @@ export async function generateInvitationPDF(
         yPos += 16;
       });
 
-      yPos += 5;
+      yPos += 20;
       doc
         .font("Helvetica-Bold")
         .fontSize(10)
         .fillColor("#8b7355")
         .text("Accès Événement", 30, yPos, { width: doc.page.width - 60, align: "center" });
 
+      const locationText = data.type === '19' ? "Yeni Yaşam - 19 Mars" : "21 Mars - Bruxelles";
+      doc
+        .font("Helvetica")
+        .fontSize(8)
+        .text(locationText, 30, yPos + 12, { width: doc.page.width - 60, align: "center" });
+
       // Generate QR code
-      const qrDataUrl = await QRCode.toDataURL(data.id.toString(), {
+      const qrPayload = data.type ? `${data.id}-${data.type}` : data.id.toString();
+      const qrDataUrl = await QRCode.toDataURL(qrPayload, {
         errorCorrectionLevel: "H",
         type: "image/png",
         width: 150,
@@ -127,10 +146,10 @@ export async function generateInvitationPDF(
       );
 
       const qrX = centerX - 35;
-      const qrY = yPos + 12;
+      const qrY = yPos + 35;
       doc.image(qrBuffer, qrX, qrY, { width: 70, height: 70 });
 
-      if (data.tableNumber) {
+      if (data.tableNumber && data.type !== '19') {
         doc
           .font("Helvetica-Bold")
           .fontSize(11)
@@ -146,7 +165,7 @@ export async function generateInvitationPDF(
         .fontSize(7)
         .fillColor("#999")
         .text(
-          "Merci de confirmer votre présence",
+          "Merci de présenter ce code à l'entrée",
           30,
           doc.page.height - 30,
           { width: doc.page.width - 60, align: "center" }

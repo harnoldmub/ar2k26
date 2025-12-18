@@ -1,23 +1,35 @@
-import { Switch, Route } from "wouter";
+import { Switch, Route, useLocation } from "wouter";
 import { queryClient } from "./lib/queryClient";
 import { QueryClientProvider } from "@tanstack/react-query";
 import { Toaster } from "@/components/ui/toaster";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { ThemeProvider } from "@/components/theme-provider";
-import { Button } from "@/components/ui/button";
 import { useAuth } from "@/hooks/useAuth";
+import { useEffect } from "react";
 import Landing from "@/pages/landing";
 import Admin from "@/pages/admin";
 import Login from "@/pages/login";
+import Invitation from "@/pages/invitation";
+import CheckIn from "@/pages/checkin";
 import NotFound from "@/pages/not-found";
 
 function Router() {
   const { isAuthenticated, isLoading } = useAuth();
+  const [location, setLocation] = useLocation();
+
+  // Auto-redirect to login if trying to access /admin without auth
+  useEffect(() => {
+    if (!isLoading && !isAuthenticated && location === "/admin") {
+      setLocation("/login");
+    }
+  }, [isLoading, isAuthenticated, location, setLocation]);
 
   return (
     <Switch>
       <Route path="/" component={Landing} />
       <Route path="/login" component={Login} />
+      <Route path="/checkin" component={CheckIn} />
+      <Route path="/invitation/:id" component={Invitation} />
       <Route path="/admin">
         {isLoading ? (
           <div className="min-h-screen flex items-center justify-center">
@@ -28,27 +40,7 @@ function Router() {
           </div>
         ) : isAuthenticated ? (
           <Admin />
-        ) : (
-          <div className="min-h-screen flex items-center justify-center p-6">
-            <div className="text-center max-w-md">
-              <h1 className="text-2xl md:text-3xl font-serif font-bold text-foreground mb-4">
-                Accès administrateur
-              </h1>
-              <p className="text-muted-foreground font-sans mb-8">
-                Vous devez être connecté pour accéder à cet espace.
-              </p>
-              <Button
-                size="lg"
-                onClick={() => {
-                  window.location.href = "/login";
-                }}
-                data-testid="button-admin-login"
-              >
-                Se connecter
-              </Button>
-            </div>
-          </div>
-        )}
+        ) : null}
       </Route>
       <Route component={NotFound} />
     </Switch>
