@@ -48,6 +48,7 @@ import gallery2 from "@assets/IMG_6346_1760648863844.jpg";
 import gallery3 from "@assets/IMG_6359_1760648863845.jpg";
 import gallery4 from "@assets/IMG_6362_1760648863845.jpg";
 import gallery5 from "@assets/IMG_7449_1760648927188.jpg";
+import logoRA from "@assets/logo-ra.png";
 import gallery6 from "@assets/IMG_1122_1760648927187.jpg";
 
 const galleryImages = [
@@ -201,6 +202,8 @@ function Lightbox({
         >
           <X className="h-6 w-6" />
         </Button>
+
+
       </div>
 
       <div className="flex flex-col items-center gap-4 max-w-5xl w-full">
@@ -285,6 +288,7 @@ export default function Landing() {
       firstName: "",
       lastName: "",
       email: "",
+      phone: "",
       partySize: 1,
       availability: undefined,
     },
@@ -319,8 +323,19 @@ export default function Landing() {
 
   return (
     <div className="min-h-screen bg-background">
+      {/* Fixed Header with Logo */}
+      <header className="fixed top-0 left-0 right-0 z-50 bg-background/80 backdrop-blur-md border-b border-primary/10">
+        <div className="container mx-auto px-6 py-4 flex justify-center">
+          <img
+            src={logoRA}
+            alt="R&A Logo"
+            className="h-12 md:h-16 w-auto"
+          />
+        </div>
+      </header>
+
       {/* Hero Section */}
-      <section className="relative min-h-screen flex items-center justify-center overflow-hidden bg-background">
+      <section className="relative min-h-screen flex items-center justify-center overflow-hidden bg-background pt-20">
         <motion.div
           className="absolute inset-0 bg-cover bg-center opacity-20"
           style={{
@@ -371,12 +386,12 @@ export default function Landing() {
               className="rounded-full px-12 py-6 text-sm tracking-widest uppercase font-semibold shadow-lg hover:shadow-xl transition-all"
               onClick={() => {
                 document
-                  .getElementById("program")
+                  .getElementById("rsvp")
                   ?.scrollIntoView({ behavior: "smooth" });
               }}
               data-testid="button-voir-plus"
             >
-              Découvrir le Programme
+              Confirmer votre présence
             </Button>
           </div>
         </div>
@@ -386,160 +401,14 @@ export default function Landing() {
         </div>
       </section>
 
-      {/* Story Section */}
-      <section
-        id="story"
-        className="py-24 md:py-32 lg:py-40 px-6 bg-background"
-      >
-        <div className="max-w-7xl mx-auto">
-          <div className="grid grid-cols-1 lg:grid-cols-3 gap-8 lg:gap-12 items-center">
-            {/* Arnold Portrait */}
-            <div className="order-2 lg:order-1 animate-in fade-in slide-in-from-left-8 duration-700">
-              <div
-                className="aspect-[3/4] overflow-hidden bg-muted max-w-xs mx-auto hover:shadow-xl transition-shadow duration-300"
-                data-testid="card-arnold"
-              >
-                <img
-                  src={arnoldPortrait}
-                  alt="Arnold"
-                  className="w-full h-full object-cover hover:scale-105 transition-transform duration-500"
-                  data-testid="img-arnold"
-                />
-              </div>
-            </div>
-
-            {/* Center Text */}
-            <div className="order-1 lg:order-2 text-center px-4 lg:px-8 animate-in fade-in zoom-in duration-700 animation-delay-200">
-              <h2 className="text-3xl md:text-4xl font-serif font-light text-foreground mb-8 tracking-wide">
-                NOTRE HISTOIRE
-              </h2>
-
-              <div className="h-px w-16 bg-primary mx-auto mb-8 animate-in scale-x-0 origin-center duration-1000 animation-delay-300" />
-
-              <p className="text-sm md:text-base font-sans leading-relaxed text-muted-foreground mb-8 italic animate-in fade-in duration-700 animation-delay-400">
-                "Notre histoire a commencé comme un conte de fées moderne. Deux
-                âmes destinées à se rencontrer, réunies par le destin et
-                l'amour."
-              </p>
-
-              <p className="text-xs md:text-sm font-sans text-foreground tracking-widest animate-in fade-in duration-700 animation-delay-500">
-                Ruth & Arnold
-              </p>
-            </div>
-
-            {/* Ruth Portrait */}
-            <div className="order-3 animate-in fade-in slide-in-from-right-8 duration-700">
-              <div
-                className="aspect-[3/4] overflow-hidden bg-muted max-w-xs mx-auto hover:shadow-xl transition-shadow duration-300"
-                data-testid="card-ruth"
-              >
-                <img
-                  src={ruthPortrait}
-                  alt="Ruth"
-                  className="w-full h-full object-cover hover:scale-105 transition-transform duration-500"
-                  data-testid="img-ruth"
-                />
-              </div>
-            </div>
-          </div>
-        </div>
-      </section>
-
-      {/* Program Section */}
-      <section
-        id="program"
-        className="py-24 md:py-32 lg:py-40 px-6 bg-gradient-to-b from-background to-muted/20"
-      >
-        <div className="max-w-6xl mx-auto">
-          <h2 className="text-4xl md:text-5xl lg:text-6xl font-serif font-light text-foreground mb-16 text-center tracking-wide animate-in fade-in slide-in-from-top-4 duration-700">
-            PROGRAMME DE CÉLÉBRATION
-          </h2>
-
-          <div className="grid grid-cols-1 lg:grid-cols-2 gap-8 lg:gap-12">
-            {/* March 19 */}
-            <Card className="p-10 md:p-12 border-l-4 border-l-primary hover:shadow-xl transition-all duration-300 animate-in fade-in slide-in-from-left-8 duration-700">
-              <div className="flex items-center gap-3 mb-8">
-                <div className="w-12 h-12 rounded-full bg-primary/10 flex items-center justify-center">
-                  <span className="text-2xl font-serif font-bold text-primary">19</span>
-                </div>
-                <div>
-                  <h3 className="text-2xl md:text-3xl font-serif font-semibold text-foreground">
-                    JEUDI 19 MARS
-                  </h3>
-                  <p className="text-sm text-muted-foreground font-sans">Dot & Cérémonie</p>
-                </div>
-              </div>
-              <div className="space-y-4">
-                <div className="flex gap-4 pb-4 border-b border-border/50">
-                  <div className="w-1 bg-primary rounded-full mt-1 flex-shrink-0" />
-                  <div>
-                    <p className="font-sans font-semibold text-foreground">Dot</p>
-                    <p className="text-sm text-muted-foreground">
-                      Lieu: À confirmer
-                      <br />
-                      Heure: À confirmer
-                    </p>
-                  </div>
-                </div>
-              </div>
-            </Card>
-
-            {/* March 21 */}
-            <Card className="p-10 md:p-12 border-l-4 border-l-chart-2 hover:shadow-xl transition-all duration-300 animate-in fade-in slide-in-from-right-8 duration-700 animation-delay-200">
-              <div className="flex items-center gap-3 mb-8">
-                <div className="w-12 h-12 rounded-full bg-chart-2/10 flex items-center justify-center">
-                  <span className="text-2xl font-serif font-bold text-chart-2">21</span>
-                </div>
-                <div>
-                  <h3 className="text-2xl md:text-3xl font-serif font-semibold text-foreground">
-                    SAMEDI 21 MARS
-                  </h3>
-                  <p className="text-sm text-muted-foreground font-sans">Mariage & Réception</p>
-                </div>
-              </div>
-              <div className="space-y-4">
-                <div className="flex gap-4 pb-4 border-b border-border/50">
-                  <div className="w-1 bg-chart-2 rounded-full mt-1 flex-shrink-0" />
-                  <div>
-                    <p className="font-sans font-semibold text-foreground">Mariage Civil</p>
-                    <p className="text-sm text-muted-foreground">10h00</p>
-                  </div>
-                </div>
-                <div className="flex gap-4 pb-4 border-b border-border/50">
-                  <div className="w-1 bg-chart-2 rounded-full mt-1 flex-shrink-0" />
-                  <div>
-                    <p className="font-sans font-semibold text-foreground">Bénédiction</p>
-                    <p className="text-sm text-muted-foreground">13h00</p>
-                  </div>
-                </div>
-                <div className="flex gap-4">
-                  <div className="w-1 bg-chart-2 rounded-full mt-1 flex-shrink-0" />
-                  <div>
-                    <p className="font-sans font-semibold text-foreground">Soirée & Réception</p>
-                    <p className="text-sm text-muted-foreground">20h00</p>
-                  </div>
-                </div>
-              </div>
-            </Card>
-          </div>
-
-          <div className="max-w-4xl mx-auto mt-16 border-t border-border pt-12">
-            <h3 className="text-lg md:text-xl font-sans font-semibold text-foreground mb-8 text-center tracking-widest uppercase">
-              Compte à rebours
-            </h3>
-            <Countdown />
-          </div>
-        </div>
-      </section>
-
-      {/* Accommodation Section */}
-      <AccommodationSection />
-
       {/* RSVP Section */}
-      <section className="py-24 md:py-32 lg:py-40 px-6 bg-muted/30">
+      <section id="rsvp" className="py-24 md:py-32 lg:py-40 px-6 bg-muted/30">
         <div className="max-w-3xl mx-auto">
           {!isSubmitted ? (
             <>
+              <div className="mb-12">
+                <Countdown />
+              </div>
               <h2 className="text-3xl md:text-4xl font-serif font-light text-center mb-12 text-foreground tracking-wide animate-in fade-in slide-in-from-top-4 duration-700">
                 CONFIRMEZ VOTRE PRÉSENCE
               </h2>
@@ -619,6 +488,80 @@ export default function Landing() {
                           <FormMessage />
                         </FormItem>
                       )}
+                    />
+
+                    <FormField
+                      control={form.control}
+                      name="phone"
+                      render={({ field }) => {
+                        const COUNTRY_CODES = [
+                          { code: "+33", label: "🇫🇷 +33" },
+                          { code: "+32", label: "🇧🇪 +32" },
+                          { code: "+243", label: "🇨🇩 +243" },
+                          { code: "+41", label: "🇨🇭 +41" },
+                          { code: "+352", label: "🇱🇺 +352" },
+                          { code: "+44", label: "🇬🇧 +44" },
+                          { code: "+1", label: "🇺🇸 +1" },
+                          { code: "+43", label: "🇦🇹 +43" },
+                          { code: "+27", label: "🇿🇦 +27" },
+                          { code: "+244", label: "🇦🇴 +244" },
+                          { code: "+225", label: "🇨🇮 +225" },
+                          { code: "+31", label: "🇳🇱 +31" },
+                          { code: "+49", label: "🇩🇪 +49" },
+                          { code: "+34", label: "🇪🇸 +34" },
+                        ];
+
+                        // Parse current value
+                        const currentValue = field.value || "";
+                        const match = COUNTRY_CODES.find(c => currentValue.startsWith(c.code));
+                        const countryCode = match ? match.code : "+33";
+                        const localNumber = match ? currentValue.slice(match.code.length) : currentValue;
+
+                        return (
+                          <FormItem>
+                            <FormLabel className="text-base font-sans font-semibold text-foreground">
+                              Numéro WhatsApp (Optionnel)
+                            </FormLabel>
+                            <FormControl>
+                              <div className="flex gap-2">
+                                <Select
+                                  value={countryCode}
+                                  onValueChange={(newCode) => {
+                                    field.onChange(newCode + localNumber);
+                                  }}
+                                >
+                                  <SelectTrigger className="w-[100px] bg-background/50 border-primary/20">
+                                    <SelectValue />
+                                  </SelectTrigger>
+                                  <SelectContent>
+                                    {COUNTRY_CODES.map((c) => (
+                                      <SelectItem key={c.code} value={c.code}>
+                                        {c.label}
+                                      </SelectItem>
+                                    ))}
+                                  </SelectContent>
+                                </Select>
+                                <Input
+                                  type="tel"
+                                  value={localNumber}
+                                  onChange={(e) => {
+                                    const newNum = e.target.value;
+                                    if (!newNum) field.onChange("");
+                                    else field.onChange(countryCode + newNum);
+                                  }}
+                                  placeholder="6 12 34 56 78"
+                                  className="flex-1 rounded-lg border-2 border-primary/20 focus:border-primary transition-all hover:border-primary/40 bg-background/50"
+                                  data-testid="input-phone"
+                                />
+                              </div>
+                            </FormControl>
+                            <p className="text-xs text-muted-foreground">
+                              Facultatif : pour recevoir votre invitation directement sur WhatsApp.
+                            </p>
+                            <FormMessage />
+                          </FormItem>
+                        );
+                      }}
                     />
 
                     <FormField
@@ -765,6 +708,147 @@ export default function Landing() {
         </div>
       </section>
 
+      {/* Story Section */}
+      <section
+        id="story"
+        className="py-24 md:py-32 lg:py-40 px-6 bg-background"
+      >
+        <div className="max-w-7xl mx-auto">
+          <div className="grid grid-cols-1 lg:grid-cols-3 gap-8 lg:gap-12 items-center">
+            {/* Arnold Portrait */}
+            <div className="order-2 lg:order-1 animate-in fade-in slide-in-from-left-8 duration-700">
+              <div
+                className="aspect-[3/4] overflow-hidden bg-muted max-w-xs mx-auto hover:shadow-xl transition-shadow duration-300"
+                data-testid="card-arnold"
+              >
+                <img
+                  src={arnoldPortrait}
+                  alt="Arnold"
+                  className="w-full h-full object-cover hover:scale-105 transition-transform duration-500"
+                  data-testid="img-arnold"
+                />
+              </div>
+            </div>
+
+            {/* Center Text */}
+            <div className="order-1 lg:order-2 text-center px-4 lg:px-8 animate-in fade-in zoom-in duration-700 animation-delay-200">
+              <h2 className="text-3xl md:text-4xl font-serif font-light text-foreground mb-8 tracking-wide">
+                NOTRE HISTOIRE
+              </h2>
+
+              <div className="h-px w-16 bg-primary mx-auto mb-8 animate-in scale-x-0 origin-center duration-1000 animation-delay-300" />
+
+              <p className="text-sm md:text-base font-sans leading-relaxed text-muted-foreground mb-8 italic animate-in fade-in duration-700 animation-delay-400">
+                "Notre histoire a commencé comme un conte de fées moderne. Deux
+                âmes destinées à se rencontrer, réunies par le destin et
+                l'amour."
+              </p>
+
+              <p className="text-xs md:text-sm font-sans text-foreground tracking-widest animate-in fade-in duration-700 animation-delay-500">
+                Ruth & Arnold
+              </p>
+            </div>
+
+            {/* Ruth Portrait */}
+            <div className="order-3 animate-in fade-in slide-in-from-right-8 duration-700">
+              <div
+                className="aspect-[3/4] overflow-hidden bg-muted max-w-xs mx-auto hover:shadow-xl transition-shadow duration-300"
+                data-testid="card-ruth"
+              >
+                <img
+                  src={ruthPortrait}
+                  alt="Ruth"
+                  className="w-full h-full object-cover hover:scale-105 transition-transform duration-500"
+                  data-testid="img-ruth"
+                />
+              </div>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      {/* Program Section */}
+      <section
+        id="program"
+        className="py-24 md:py-32 lg:py-40 px-6 bg-gradient-to-b from-background to-muted/20"
+      >
+        <div className="max-w-6xl mx-auto">
+          <h2 className="text-4xl md:text-5xl lg:text-6xl font-serif font-light text-foreground mb-16 text-center tracking-wide animate-in fade-in slide-in-from-top-4 duration-700">
+            PROGRAMME DE CÉLÉBRATION
+          </h2>
+
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-8 lg:gap-12">
+            {/* March 19 */}
+            <Card className="p-10 md:p-12 border-l-4 border-l-primary hover:shadow-xl transition-all duration-300 animate-in fade-in slide-in-from-left-8 duration-700">
+              <div className="flex items-center gap-3 mb-8">
+                <div className="w-12 h-12 rounded-full bg-primary/10 flex items-center justify-center">
+                  <span className="text-2xl font-serif font-bold text-primary">19</span>
+                </div>
+                <div>
+                  <h3 className="text-2xl md:text-3xl font-serif font-semibold text-foreground">
+                    JEUDI 19 MARS
+                  </h3>
+                  <p className="text-sm text-muted-foreground font-sans">Dot & Cérémonie</p>
+                </div>
+              </div>
+              <div className="space-y-4">
+                <div className="flex gap-4 pb-4 border-b border-border/50">
+                  <div className="w-1 bg-primary rounded-full mt-1 flex-shrink-0" />
+                  <div>
+                    <p className="font-sans font-semibold text-foreground">Dot</p>
+                    <p className="text-sm text-muted-foreground">
+                      Lieu: À confirmer
+                      <br />
+                      Heure: À confirmer
+                    </p>
+                  </div>
+                </div>
+              </div>
+            </Card>
+
+            {/* March 21 */}
+            <Card className="p-10 md:p-12 border-l-4 border-l-chart-2 hover:shadow-xl transition-all duration-300 animate-in fade-in slide-in-from-right-8 duration-700 animation-delay-200">
+              <div className="flex items-center gap-3 mb-8">
+                <div className="w-12 h-12 rounded-full bg-chart-2/10 flex items-center justify-center">
+                  <span className="text-2xl font-serif font-bold text-chart-2">21</span>
+                </div>
+                <div>
+                  <h3 className="text-2xl md:text-3xl font-serif font-semibold text-foreground">
+                    SAMEDI 21 MARS
+                  </h3>
+                  <p className="text-sm text-muted-foreground font-sans">Mariage & Réception</p>
+                </div>
+              </div>
+              <div className="space-y-4">
+                <div className="flex gap-4 pb-4 border-b border-border/50">
+                  <div className="w-1 bg-chart-2 rounded-full mt-1 flex-shrink-0" />
+                  <div>
+                    <p className="font-sans font-semibold text-foreground">Mariage Civil</p>
+                    <p className="text-sm text-muted-foreground">10h00</p>
+                  </div>
+                </div>
+                <div className="flex gap-4 pb-4 border-b border-border/50">
+                  <div className="w-1 bg-chart-2 rounded-full mt-1 flex-shrink-0" />
+                  <div>
+                    <p className="font-sans font-semibold text-foreground">Bénédiction</p>
+                    <p className="text-sm text-muted-foreground">13h00</p>
+                  </div>
+                </div>
+                <div className="flex gap-4">
+                  <div className="w-1 bg-chart-2 rounded-full mt-1 flex-shrink-0" />
+                  <div>
+                    <p className="font-sans font-semibold text-foreground">Soirée & Réception</p>
+                    <p className="text-sm text-muted-foreground">20h00</p>
+                  </div>
+                </div>
+              </div>
+            </Card>
+          </div>
+
+
+        </div>
+      </section>
+
       {/* Gallery Section */}
       <section
         id="galerie"
@@ -796,6 +880,9 @@ export default function Landing() {
         </div>
       </section>
 
+      {/* Accommodation Section */}
+      <AccommodationSection />
+
       {/* Footer */}
       <footer className="py-16 md:py-20 px-6 border-t border-border bg-background">
         <div className="max-w-7xl mx-auto">
@@ -811,6 +898,15 @@ export default function Landing() {
                   data-testid="link-contact-email"
                 >
                   contact@ar2k26.com
+                </a>
+                <a
+                  href="https://wa.me/33698827193"
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="block text-sm text-muted-foreground hover:text-primary transition-colors font-sans"
+                  data-testid="link-contact-whatsapp"
+                >
+                  WhatsApp: +33 6 98 82 71 93
                 </a>
                 <p className="text-sm text-muted-foreground font-sans">
                   Paris, France
