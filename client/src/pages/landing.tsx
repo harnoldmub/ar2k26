@@ -46,7 +46,7 @@ import gallery3 from "@assets/IMG_6359_1760648863845.jpg";
 import gallery4 from "@assets/IMG_6362_1760648863845.jpg";
 import gallery5 from "@assets/IMG_7449_1760648927188.jpg";
 import logoRA from "@assets/logo-ra.png";
-import gallery6 from "@assets/IMG_1122_1760648927187.jpg";
+import marryMePhoto from "@assets/IMG_6346_1760648863844.jpg";
 
 const galleryImages = [
   {
@@ -66,7 +66,7 @@ const galleryImages = [
   },
   { id: "kiss-bouquet", src: gallery4, alt: "Notre baiser avec les roses" },
   { id: "selfie-outdoor", src: gallery5, alt: "Selfie en amoureux" },
-  { id: "fun-selfie", src: gallery6, alt: "Moment de complicité" },
+  { id: "marry-me", src: marryMePhoto, alt: "La grande demande - Marry Me" },
 ];
 
 function Countdown() {
