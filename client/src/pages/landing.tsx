@@ -323,19 +323,8 @@ export default function Landing() {
 
   return (
     <div className="min-h-screen bg-background">
-      {/* Fixed Header with Logo */}
-      <header className="fixed top-0 left-0 right-0 z-50 bg-background/80 backdrop-blur-md border-b border-primary/10">
-        <div className="container mx-auto px-6 py-4 flex justify-center">
-          <img
-            src={logoRA}
-            alt="R&A Logo"
-            className="h-12 md:h-16 w-auto"
-          />
-        </div>
-      </header>
-
       {/* Hero Section */}
-      <section className="relative min-h-screen flex items-center justify-center overflow-hidden bg-background pt-20">
+      <section className="relative min-h-screen flex items-center justify-center overflow-hidden bg-background">
         <motion.div
           className="absolute inset-0 bg-cover bg-center opacity-20"
           style={{
@@ -353,8 +342,23 @@ export default function Landing() {
         <div className="absolute inset-0 bg-gradient-to-b from-white/5 via-white/10 to-background/80" />
 
         <div className="relative z-10 text-center px-6 max-w-6xl mx-auto">
-          <div className="mb-12 animate-fade-in-up">
-            <p className="text-sm md:text-base font-sans tracking-[0.3em] uppercase text-muted-foreground mb-8">
+          {/* Logo prominent en haut */}
+          <motion.div 
+            className="mb-8 animate-fade-in-up"
+            initial={{ opacity: 0, y: -30 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ duration: 1, ease: "easeOut" }}
+          >
+            <img
+              src={logoRA}
+              alt="R&A Logo"
+              className="h-32 md:h-40 lg:h-48 w-auto mx-auto drop-shadow-2xl"
+              data-testid="logo-hero"
+            />
+          </motion.div>
+          
+          <div className="mb-8 animate-fade-in-up animation-delay-200">
+            <p className="text-sm md:text-base font-sans tracking-[0.3em] uppercase text-muted-foreground mb-4">
               Celebrating Love
             </p>
           </div>
