@@ -42,6 +42,8 @@ import { AccommodationSection } from "@/components/accommodation";
 import { motion, useScroll, useTransform } from "framer-motion";
 import heroImage from "@assets/IMG_6360_1760648841327.jpg";
 import couplePhoto from "@assets/DSC_8913_1766077508558.jpg";
+import gallery3 from "@assets/IMG_6359_1760648863845.jpg";
+import gallery4 from "@assets/IMG_6362_1760648863845.jpg";
 import gallery5 from "@assets/IMG_7449_1760648927188.jpg";
 import logoRA from "@assets/logo-ra.png";
 import gallery6 from "@assets/IMG_1122_1760648927187.jpg";
@@ -57,6 +59,12 @@ const galleryImages = [
     src: "/gallery/IMG_8381.JPG",
     alt: "Notre belle complicité",
   },
+  {
+    id: "engagement-bouquet",
+    src: gallery3,
+    alt: "Nos fiançailles avec le bouquet",
+  },
+  { id: "kiss-bouquet", src: gallery4, alt: "Notre baiser avec les roses" },
   { id: "selfie-outdoor", src: gallery5, alt: "Selfie en amoureux" },
   { id: "fun-selfie", src: gallery6, alt: "Moment de complicité" },
 ];
