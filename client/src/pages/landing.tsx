@@ -298,7 +298,11 @@ export default function Landing() {
       form.reset();
       queryClient.invalidateQueries({ queryKey: ["/api/rsvp"] });
 
-      // Ne pas scroller - rester sur la réponse affichée
+      // Scroller vers le haut de la section RSVP
+      setTimeout(() => {
+        const element = document.getElementById("rsvp");
+        element?.scrollIntoView({ behavior: "smooth", block: "start" });
+      }, 100);
     },
     onError: (error: Error) => {
       toast({
