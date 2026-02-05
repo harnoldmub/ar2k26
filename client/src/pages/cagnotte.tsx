@@ -263,6 +263,18 @@ export default function CagnottePage() {
               <Countdown />
             </div>
 
+            {totalData && totalData.total > 0 && (
+              <div className="text-center mb-8 py-4 px-6 bg-primary/5 rounded-lg border border-primary/10">
+                <div className="flex items-center justify-center gap-2 text-sm text-muted-foreground mb-1">
+                  <Heart className="h-4 w-4 text-primary" />
+                  <span>Total collecté</span>
+                </div>
+                <p className="text-2xl md:text-3xl font-serif font-bold text-primary" data-testid="text-total-collected">
+                  {new Intl.NumberFormat("fr-FR", { style: "currency", currency: "EUR" }).format(totalData.total / 100)}
+                </p>
+              </div>
+            )}
+
             {liveData && liveData.recent && liveData.recent.length > 0 && (
               <AnimatedMessages messages={liveData.recent} />
             )}
