@@ -2,6 +2,7 @@ import {
   users,
   rsvpResponses,
   contributions,
+  guestbookEntries,
   type User,
   type UpsertUser,
   type RsvpResponse,
@@ -9,6 +10,8 @@ import {
   type UpdateRsvpResponse,
   type Contribution,
   type InsertContribution,
+  type GuestbookEntry,
+  type InsertGuestbookEntry,
 } from "@shared/schema";
 import { db } from "./db";
 import { eq, and, ne, sql, asc } from "drizzle-orm";
@@ -28,9 +31,35 @@ export interface IStorage {
   updateRsvpResponse(id: number, response: UpdateRsvpResponse): Promise<RsvpResponse>;
   getRsvpResponseByQrToken(token: string): Promise<RsvpResponse | undefined>;
   getRsvpByEmailAndFirstName(email: string, firstName: string): Promise<RsvpResponse | undefined>;
+
+  // Contribution operations
+  createContribution(data: InsertContribution & { stripeSessionId: string }): Promise<Contribution>;
+  getContributionBySessionId(sessionId: string): Promise<Contribution | undefined>;
+  updateContributionStatus(sessionId: string, status: string, paymentIntentId?: string): Promise<Contribution | undefined>;
+  getCompletedContributions(): Promise<Contribution[]>;
+  getTotalContributions(): Promise<number>;
+  getRecentContributions(limit?: number): Promise<Contribution[]>;
+  getLatestContribution(): Promise<Contribution | undefined>;
+  getGuestbookEntries(): Promise<GuestbookEntry[]>;
+  createGuestbookEntry(data: InsertGuestbookEntry): Promise<GuestbookEntry>;
 }
 
 export class DatabaseStorage implements IStorage {
+  private contributionListSelect() {
+    return {
+      id: contributions.id,
+      donorName: contributions.donorName,
+      amount: contributions.amount,
+      currency: contributions.currency,
+      message: contributions.message,
+      stripeSessionId: sql<string | null>`NULL`.as("stripe_session_id"),
+      stripePaymentIntentId: contributions.stripePaymentIntentId,
+      status: contributions.status,
+      createdAt: contributions.createdAt,
+      completedAt: contributions.completedAt,
+    };
+  }
+
   // User operations (IMPORTANT - mandatory for Replit Auth)
   async getUser(id: string): Promise<User | undefined> {
     const [user] = await db.select().from(users).where(eq(users.id, id));
@@ -178,9 +207,10 @@ export class DatabaseStorage implements IStorage {
 
   async getCompletedContributions(): Promise<Contribution[]> {
     return await db
-      .select()
+      .select(this.contributionListSelect())
       .from(contributions)
-      .where(eq(contributions.status, 'completed'));
+      .where(eq(contributions.status, 'completed'))
+      .orderBy(sql`${contributions.completedAt} DESC NULLS LAST, ${contributions.createdAt} DESC`);
   }
 
   async getTotalContributions(): Promise<number> {
@@ -193,7 +223,7 @@ export class DatabaseStorage implements IStorage {
 
   async getRecentContributions(limit: number = 10): Promise<Contribution[]> {
     return await db
-      .select()
+      .select(this.contributionListSelect())
       .from(contributions)
       .where(eq(contributions.status, 'completed'))
       .orderBy(sql`${contributions.completedAt} DESC NULLS LAST`)
@@ -202,12 +232,31 @@ export class DatabaseStorage implements IStorage {
 
   async getLatestContribution(): Promise<Contribution | undefined> {
     const result = await db
-      .select()
+      .select(this.contributionListSelect())
       .from(contributions)
       .where(eq(contributions.status, 'completed'))
       .orderBy(sql`${contributions.completedAt} DESC NULLS LAST`)
       .limit(1);
     return result[0];
+  }
+
+  async getGuestbookEntries(): Promise<GuestbookEntry[]> {
+    return await db
+      .select()
+      .from(guestbookEntries)
+      .orderBy(sql`${guestbookEntries.createdAt} DESC`);
+  }
+
+  async createGuestbookEntry(data: InsertGuestbookEntry): Promise<GuestbookEntry> {
+    const [entry] = await db
+      .insert(guestbookEntries)
+      .values({
+        authorName: data.authorName,
+        message: data.message,
+      })
+      .returning();
+
+    return entry;
   }
 }
 

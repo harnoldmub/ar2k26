@@ -23,6 +23,7 @@ import RsvpConfirmChoice from "@/pages/rsvp-confirm-choice";
 import GiftListSignup from "@/pages/gift-list-signup";
 import GiftListMC from "@/pages/gift-list-mc";
 import Programme from "@/pages/programme";
+import LivreDorPage from "@/pages/livre-dor";
 import Accueil from "@/pages/accueil";
 import NotFound from "@/pages/not-found";
 
@@ -55,6 +56,7 @@ function Router() {
       <Route path="/liste-cadeaux" component={GiftListSignup} />
       <Route path="/liste-cadeaux/mc" component={GiftListMC} />
       <Route path="/programme" component={Programme} />
+      <Route path="/livre-dor" component={LivreDorPage} />
       <Route path="/accueil" component={Accueil} />
       <Route path="/admin">
         {isLoading ? (

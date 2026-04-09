@@ -4,7 +4,7 @@ import crypto from "crypto";
 import { storage } from "./storage";
 import { getSession } from "./replitAuth";
 import { setupLocalAuth, isLocallyAuthenticated } from "./localAuth";
-import { insertRsvpResponseSchema, updateRsvpResponseSchema, insertContributionSchema, rsvpResponses, giftListSignups, insertGiftListSignupSchema } from "@shared/schema";
+import { insertRsvpResponseSchema, updateRsvpResponseSchema, insertContributionSchema, rsvpResponses, giftListSignups, insertGiftListSignupSchema, insertGuestbookEntrySchema } from "@shared/schema";
 import { eq, asc, sql } from "drizzle-orm";
 import { db } from "./db";
 import { sendRsvpConfirmationEmail, sendPersonalizedInvitation, sendGuestConfirmationEmail, sendContributionNotification, sendContributorThankYou, sendDateChangeApologyEmail, sendGalaInvitationEmail, sendInvitation21Email, buildGalaEmailHtml, buildInvitation21EmailHtml, sendReminderEmail, buildReminderEmailHtml } from "./email";
@@ -1580,6 +1580,71 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  app.get("/api/contributions/confirmed", async (req, res) => {
+    try {
+      const contributions = await storage.getCompletedContributions();
+      res.json(contributions);
+    } catch (error) {
+      console.error("Error getting confirmed contributions:", error);
+      res.status(500).json({ message: "Erreur lors de la récupération des messages" });
+    }
+  });
+
+  app.get("/api/guestbook/messages", async (_req, res) => {
+    try {
+      const [guestbookMessages, contributionMessages] = await Promise.all([
+        storage.getGuestbookEntries(),
+        storage.getCompletedContributions(),
+      ]);
+
+      const normalizedMessages = [
+        ...guestbookMessages.map((entry) => ({
+          id: `guestbook-${entry.id}`,
+          authorName: entry.authorName,
+          message: entry.message,
+          createdAt: entry.createdAt,
+          source: "guestbook" as const,
+        })),
+        ...contributionMessages
+          .filter((entry) => entry.message && entry.message.trim().length > 0)
+          .map((entry) => ({
+            id: `contribution-${entry.id}`,
+            authorName: entry.donorName,
+            message: entry.message!.trim(),
+            createdAt: entry.completedAt ?? entry.createdAt,
+            source: "contribution" as const,
+          })),
+      ].sort((a, b) => {
+        const dateA = a.createdAt ? new Date(a.createdAt).getTime() : 0;
+        const dateB = b.createdAt ? new Date(b.createdAt).getTime() : 0;
+        return dateB - dateA;
+      });
+
+      res.json(normalizedMessages);
+    } catch (error) {
+      console.error("Error getting guestbook messages:", error);
+      res.status(500).json({ message: "Erreur lors de la récupération du livre d'or" });
+    }
+  });
+
+  app.post("/api/guestbook/messages", async (req, res) => {
+    try {
+      const validated = insertGuestbookEntrySchema.parse(req.body);
+      const entry = await storage.createGuestbookEntry({
+        authorName: validated.authorName.trim(),
+        message: validated.message.trim(),
+      });
+
+      res.status(201).json(entry);
+    } catch (error: any) {
+      console.error("Error creating guestbook entry:", error);
+      if (error.issues) {
+        return res.status(400).json({ message: "Données invalides", details: error.issues });
+      }
+      res.status(500).json({ message: "Erreur lors de l'enregistrement du message" });
+    }
+  });
+
   // Get live contribution data (for live display during wedding)
   app.get("/api/contributions/live", async (req, res) => {
     try {
@@ -1720,4 +1785,3 @@ export async function registerRoutes(app: Express): Promise<Server> {
   const httpServer = createServer(app);
   return httpServer;
 }
-

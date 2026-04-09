@@ -151,6 +151,22 @@ export const insertContributionSchema = z.object({
 export type InsertContribution = z.infer<typeof insertContributionSchema>;
 export type Contribution = typeof contributions.$inferSelect;
 
+// Guestbook entries table
+export const guestbookEntries = pgTable("guestbook_entries", {
+  id: integer("id").primaryKey().generatedAlwaysAsIdentity(),
+  authorName: varchar("author_name", { length: 255 }).notNull(),
+  message: text("message").notNull(),
+  createdAt: timestamp("created_at").defaultNow(),
+});
+
+export const insertGuestbookEntrySchema = z.object({
+  authorName: z.string().min(2, "Veuillez entrer votre nom").max(255, "Maximum 255 caracteres"),
+  message: z.string().min(8, "Votre message doit contenir au moins 8 caracteres").max(1200, "Maximum 1200 caracteres"),
+});
+
+export type InsertGuestbookEntry = z.infer<typeof insertGuestbookEntrySchema>;
+export type GuestbookEntry = typeof guestbookEntries.$inferSelect;
+
 // Gift List Signups table
 export const giftListSignups = pgTable("gift_list_signups", {
   id: integer("id").primaryKey().generatedAlwaysAsIdentity(),

@@ -280,6 +280,21 @@ export default function CagnottePage() {
 
             <AnimatedMessages messages={messages} />
 
+            {messages.length > 0 && (
+              <div className="mb-8 text-center">
+                <Link href="/livre-dor">
+                  <Button
+                    variant="outline"
+                    className="border-primary/30 bg-primary/5 hover:bg-primary/10"
+                    data-testid="button-open-full-guestbook"
+                  >
+                    <MessageCircle className="h-4 w-4 mr-2" />
+                    Voir tous les messages dans le livre d'or
+                  </Button>
+                </Link>
+              </div>
+            )}
+
             <Form {...form}>
               <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-6">
                 <FormField

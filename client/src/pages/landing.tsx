@@ -985,6 +985,18 @@ export default function Landing() {
                     Contribuer à la cagnotte
                   </Button>
                 </Link>
+
+                <Link href="/livre-dor">
+                  <Button
+                    size="lg"
+                    variant="outline"
+                    className="border-primary/30 bg-white/70 px-8 py-6 text-lg font-sans tracking-wide text-foreground hover:bg-white"
+                    data-testid="button-open-guestbook"
+                  >
+                    <MessageCircle className="w-5 h-5 mr-2" />
+                    Ouvrir le livre d'or
+                  </Button>
+                </Link>
               </div>
             </Card>
           </div>
@@ -1080,6 +1092,13 @@ export default function Landing() {
                   data-testid="link-footer-nav-cagnotte"
                 >
                   Cagnotte
+                </a>
+                <a
+                  href="/livre-dor"
+                  className="block text-sm text-muted-foreground hover:text-primary transition-colors font-sans text-left"
+                  data-testid="link-footer-nav-guestbook"
+                >
+                  Livre d'or
                 </a>
               </div>
             </div>
