@@ -61,6 +61,31 @@ The design is inspired by luxury wedding platforms, featuring a gold and ivory c
 **Thank You Page**: `/contribution/merci` - Displays contribution confirmation and total collected amount.
 **Database**: Contributions stored with donor name, amount (cents), optional message, and Stripe session/payment IDs.
 
+## Invitation Types
+
+**Per-guest invitation type**: Each guest has an `invitationType` field (1, 2, 3, or 4) controlling what's visible on their gala invitation page:
+- **Type 1**: Full programme (Mairie + Bénédiction + Vin d'honneur + Soirée)
+- **Type 2**: Bénédiction + Vin d'honneur + Soirée
+- **Type 3**: Soirée only
+- **Type 4**: Mairie + Soirée only
+
+**Admin controls**: Individual per-row dropdown selector + bulk update via Select when guests are selected. Filter dropdown to view guests by type.
+**URL format**: `/gala/{name}?type={1|2|3|4}` — type param controls visible events; defaults to 1 if missing.
+**Integration**: WhatsApp messages, gala emails, and copy-link all include the correct `?type=` parameter.
+
+## Reminder Email Feature
+
+**Reminder email**: Sends a follow-up email to guests asking them to confirm or decline within 48h.
+- **Email design**: Gold/ivory header with urgency banner showing days remaining, confirm button (gold CTA), and decline link.
+- **Confirm link**: `GET /api/rsvp/confirm/:token` — marks guest status as `confirmed`, redirects to `/rsvp-confirmed`.
+- **Decline link**: Reuses existing `GET /api/rsvp/decline/:token` → redirects to `/decline-confirmed`.
+- **Confirmation page**: `/rsvp-confirmed` — warm confirmation page matching the site aesthetic.
+- **Single send**: Bell icon per row in admin table (amber if already sent, grey if not), with confirmation dialog if re-sending.
+- **Bulk send**: "Envoyer relance (N)" amber button appears in bulk action bar when guests are selected.
+- **Tracking**: `reminderSentAt` timestamp stored in DB per guest.
+- **Preview**: `GET /api/rsvp/:id/reminder-preview` (admin-only) returns the HTML of the reminder email.
+- **Days calculation**: Based on guest's availability (19-march = March 19, 2026; 21-march = March 21, 2026).
+
 ## Pending Features
 
 **WhatsApp API Integration**: Automatic WhatsApp messaging via API is deferred. Currently uses WhatsApp Web URL method (opens wa.me link). To enable automatic sending, user needs to provide WhatsApp Business API credentials (Twilio, Meta, or other provider) and store them as secrets.

@@ -1,6 +1,6 @@
 import { useEffect, useState, useRef } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
-import { LogOut, Search, Users, Table2, Download, Mail, Edit, Trash2, BarChart3, FileText, Plus, ArrowUp, ArrowDown, X, TrendingUp, ExternalLink, Eye, Send, RefreshCw, ChevronLeft, ChevronRight } from "lucide-react";
+import { LogOut, Search, Users, Table2, Download, Mail, Edit, Trash2, BarChart3, FileText, Plus, ArrowUp, ArrowDown, X, TrendingUp, ExternalLink, Eye, EyeOff, Send, RefreshCw, ChevronLeft, ChevronRight, Filter, Copy, PartyPopper, Calendar, CalendarDays, Check, Bell, MessageCircle } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
@@ -70,6 +70,28 @@ const WEDDING_TABLES = [
   { number: 28, name: "Amour Triomphant", subtitle: "L'amour qui surmonte tout" },
   { number: 29, name: "Scellement Divin", subtitle: "Une union bénie pour toujours" },
   { number: 30, name: "Rayon de Gloire", subtitle: "Un amour qui reflète la gloire de Dieu" },
+  { number: 31, name: "Serment Sacré", subtitle: "Un engagement devant Dieu et les hommes" },
+  { number: 32, name: "Éternelle Promesse", subtitle: "Un amour qui traverse le temps" },
+  { number: 33, name: "Chemin d'Amour", subtitle: "Marcher ensemble, aujourd'hui et toujours" },
+  { number: 34, name: "Couronne de Gloire", subtitle: "Un amour honoré et béni" },
+  { number: 35, name: "Union Glorieuse", subtitle: "Deux vies unies par la grâce" },
+  { number: 36, name: "Amour Véritable", subtitle: "Patient, fidèle et sincère" },
+  { number: 37, name: "Source de Joie", subtitle: "Un amour qui fait fleurir la vie" },
+  { number: 38, name: "Alliance Éternelle", subtitle: "Un pacte d'amour indestructible" },
+  { number: 39, name: "Horizon d'Amour", subtitle: "Un avenir bâti à deux" },
+  { number: 40, name: "Golden Love", subtitle: "L'amour célébré aujourd'hui et pour toujours" },
+  { number: 41, name: "Jardin d'Amour", subtitle: "Un amour qui grandit et fleurit chaque jour" },
+  { number: 42, name: "Promesse Éternelle", subtitle: "Un engagement fidèle pour toute la vie" },
+  { number: 43, name: "Grâce Infinie", subtitle: "Un amour porté par la bénédiction de Dieu" },
+  { number: 44, name: "Lumière d'Amour", subtitle: "L'amour qui éclaire chaque pas" },
+  { number: 45, name: "Alliance de Vie", subtitle: "Deux cœurs unis pour bâtir l'avenir" },
+  { number: 46, name: "Cœur Fidèle", subtitle: "Un amour loyal et sincère" },
+  { number: 47, name: "Chemin d'Éternité", subtitle: "Marcher ensemble au-delà du temps" },
+  { number: 48, name: "Étreinte Divine", subtitle: "Un amour guidé par la main de Dieu" },
+  { number: 49, name: "Serment d'Amour", subtitle: "Une parole donnée pour toujours" },
+  { number: 50, name: "Gloire d'Amour", subtitle: "Un amour élevé et célébré" },
+  { number: 51, name: "Amour Accompli", subtitle: "L'union parfaite scellée pour la vie" },
+  { number: 52, name: "Lumière de Grâce", subtitle: "Un amour rayonnant de bénédiction" },
 ];
 
 // Helper function to get table info by number
@@ -191,6 +213,10 @@ export default function Admin() {
   const { user, isAuthenticated, isLoading } = useAuth();
   const [searchQuery, setSearchQuery] = useState("");
   const [filterAvailability, setFilterAvailability] = useState<string>("all");
+  const [filterStatus, setFilterStatus] = useState<string>("all");
+  const [filterPartySize, setFilterPartySize] = useState<string>("all");
+  const [filterTable, setFilterTable] = useState<string>("all");
+  const [filterInvitationType, setFilterInvitationType] = useState<string>("all");
   const [sortConfig, setSortConfig] = useState<{ key: string; direction: 'asc' | 'desc' } | null>(null);
   const [currentPage, setCurrentPage] = useState(1);
   const [itemsPerPage, setItemsPerPage] = useState(20);
@@ -208,6 +234,19 @@ export default function Admin() {
   const [previewingResponse, setPreviewingResponse] = useState<RsvpResponse | null>(null);
   const [previewUrl, setPreviewUrl] = useState<string | null>(null);
   const iframeRef = useRef<HTMLIFrameElement>(null);
+
+  // Seating plan toggle mutation (persisted in database)
+  const toggleSeatingMutation = useMutation({
+    mutationFn: async (id: number) => {
+      return await apiRequest("POST", `/api/rsvp/${id}/toggle-seating`);
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/rsvp"] });
+    },
+    onError: () => {
+      toast({ title: "Erreur", description: "Impossible de modifier le plan de table", variant: "destructive" });
+    },
+  });
 
   // Add guest dialog state
   const [addGuestDialogOpen, setAddGuestDialogOpen] = useState(false);
@@ -303,6 +342,19 @@ export default function Admin() {
         description: "Impossible d'envoyer l'invitation",
         variant: "destructive",
       });
+    },
+  });
+
+  const { data: cagnotteSettings } = useQuery<{ visible: boolean }>({
+    queryKey: ["/api/settings/cagnotte-visible"],
+  });
+
+  const toggleCagnotteMutation = useMutation({
+    mutationFn: async (visible: boolean) => {
+      return await apiRequest("POST", "/api/settings/cagnotte-visible", { visible });
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/settings/cagnotte-visible"] });
     },
   });
 
@@ -455,17 +507,54 @@ export default function Admin() {
     },
   });
 
+  const updateInvitationTypeMutation = useMutation({
+    mutationFn: async ({ id, invitationType }: { id: number; invitationType: number }) => {
+      return await apiRequest("PATCH", `/api/rsvp/${id}`, { invitationType });
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/rsvp"] });
+    },
+    onError: () => {
+      toast({
+        title: "Erreur",
+        description: "Impossible de mettre à jour le type d'invitation",
+        variant: "destructive",
+      });
+    },
+  });
+
+  const bulkInvitationTypeMutation = useMutation({
+    mutationFn: async ({ ids, invitationType }: { ids: number[]; invitationType: number }) => {
+      return await apiRequest("POST", "/api/rsvp/bulk-invitation-type", { ids, invitationType });
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/rsvp"] });
+      toast({
+        title: "Type d'invitation mis à jour",
+        description: `${selectedIds.length} invité(s) modifié(s)`,
+      });
+      setSelectedIds([]);
+    },
+    onError: () => {
+      toast({
+        title: "Erreur",
+        description: "Échec de la mise à jour du type d'invitation.",
+        variant: "destructive",
+      });
+    },
+  });
+
   const whatsappMutation = useMutation({
-    mutationFn: async (id: number) => {
+    mutationFn: async ({ id, firstName, lastName, partySize }: { id: number; firstName: string; lastName: string; partySize: number }) => {
       const [whatsappRes, configRes] = await Promise.all([
         apiRequest("POST", `/api/rsvp/${id}/whatsapp-log`),
         fetch("/api/site-config")
       ]);
       const whatsappData = await whatsappRes.json();
       const configData = await configRes.json();
-      return { ...whatsappData, siteUrl: configData.siteUrl, guestId: id };
+      return { ...whatsappData, siteUrl: configData.siteUrl, guestId: id, firstName, lastName, partySize };
     },
-    onSuccess: (data: { phone?: string; siteUrl: string; guestId: number }) => {
+    onSuccess: (data: { phone?: string; siteUrl: string; guestId: number; firstName: string; lastName: string; partySize: number }) => {
       if (!data.phone) {
         toast({
           title: "Numéro manquant",
@@ -475,12 +564,15 @@ export default function Admin() {
         return;
       }
 
-      const message = `Bonjour,\nVous êtes invité à Golden Love 2026.\nVoici votre invitation et pass d'accès : ${data.siteUrl}/invitation/${data.guestId}`;
+      const invName = buildInvitationName(data.firstName, data.lastName, data.partySize);
+      const greeting = data.partySize >= 2 ? `Bonjour,` : `Bonjour ${data.firstName},`;
+      const guestLink = `${data.siteUrl}/guest/${data.guestId}`;
+      const message = `${greeting}\n\nVous êtes cordialement invité(e) au mariage de Ruth & Arnold.\n\nDécouvrez votre invitation personnalisée ici :\n${guestLink}\n\nNous avons hâte de célébrer ce moment avec vous !\n\nRuth & Arnold 💍`;
       const url = `https://wa.me/${data.phone.replace(/[^0-9]/g, '')}?text=${encodeURIComponent(message)}`;
       window.open(url, '_blank');
 
       queryClient.invalidateQueries({ queryKey: ["/api/rsvp"] });
-      toast({ title: "WhatsApp", description: "WhatsApp ouvert !" });
+      toast({ title: "WhatsApp ouvert", description: `Message prêt pour ${invName}` });
     },
     onError: () => {
       toast({ title: "Erreur", description: "Impossible de préparer WhatsApp", variant: "destructive" });
@@ -520,6 +612,218 @@ export default function Admin() {
         description: errorMessage,
         variant: "destructive",
       });
+    },
+  });
+
+  const sendInvitation21Mutation = useMutation({
+    mutationFn: async (id: number) => {
+      return await apiRequest("POST", `/api/rsvp/${id}/send-invitation-21`);
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/rsvp"] });
+      toast({
+        title: "Invitation 21 envoyée",
+        description: "L'email d'invitation du 21 mars a été envoyé",
+      });
+    },
+    onError: async (error: any) => {
+      let errorMessage = "Impossible d'envoyer l'invitation 21";
+      try {
+        const errorData = await error.json?.();
+        if (errorData?.message) errorMessage = errorData.message;
+      } catch {}
+      toast({
+        title: "Erreur",
+        description: errorMessage,
+        variant: "destructive",
+      });
+    },
+  });
+
+  const bulkAssignTableMutation = useMutation({
+    mutationFn: async ({ ids, tableNumber }: { ids: number[]; tableNumber: number | null }) => {
+      const response = await apiRequest("POST", "/api/rsvp/bulk-assign-table", { ids, tableNumber });
+      return await response.json();
+    },
+    onSuccess: (data: { count: number }) => {
+      queryClient.invalidateQueries({ queryKey: ["/api/rsvp"] });
+      toast({
+        title: "Tables attribuées",
+        description: `${data.count} invité(s) mis à jour`,
+      });
+      setSelectedIds([]);
+    },
+    onError: () => {
+      toast({ title: "Erreur", description: "Impossible d'attribuer les tables.", variant: "destructive" });
+    },
+  });
+
+  const bulkSendInvitation21Mutation = useMutation({
+    mutationFn: async (ids: number[]) => {
+      const response = await apiRequest("POST", "/api/rsvp/bulk-send-invitation-21", { ids });
+      return await response.json();
+    },
+    onSuccess: (data: { successCount: number; errorCount: number }) => {
+      queryClient.invalidateQueries({ queryKey: ["/api/rsvp"] });
+      toast({
+        title: "Invitations 21 envoyées",
+        description: `${data.successCount} envoyées, ${data.errorCount} échouées`,
+      });
+      setSelectedIds([]);
+    },
+    onError: () => {
+      toast({
+        title: "Erreur",
+        description: "Échec de l'envoi groupé des invitations 21.",
+        variant: "destructive",
+      });
+    },
+  });
+
+  const sendSmartInvitationMutation = useMutation({
+    mutationFn: async (id: number) => {
+      return await apiRequest("POST", `/api/rsvp/${id}/send-smart-invitation`);
+    },
+    onSuccess: async (res: any) => {
+      queryClient.invalidateQueries({ queryKey: ["/api/rsvp"] });
+      const data = await res.json().catch(() => ({}));
+      const sent: string[] = data.sent || [];
+      const desc = sent.length === 0
+        ? "Aucune invitation envoyée (disponibilité non définie)"
+        : `Invitation${sent.length > 1 ? "s" : ""} ${sent.map((s: string) => s === "19" ? "19 mars" : "21 mars").join(" + ")} envoyée${sent.length > 1 ? "s" : ""}`;
+      toast({ title: "Invitation envoyée", description: desc });
+    },
+    onError: async (error: any) => {
+      if (isUnauthorizedError(error)) {
+        toast({ title: "Non autorisé", description: "Vous êtes déconnecté. Reconnexion...", variant: "destructive" });
+        setTimeout(() => { window.location.href = "/login"; }, 500);
+        return;
+      }
+      let msg = "Impossible d'envoyer l'invitation";
+      try { const d = await error.json?.(); if (d?.message) msg = d.message; } catch {}
+      toast({ title: "Erreur", description: msg, variant: "destructive" });
+    },
+  });
+
+  const bulkSendSmartInvitationMutation = useMutation({
+    mutationFn: async (ids: number[]) => {
+      const response = await apiRequest("POST", "/api/rsvp/bulk-send-smart-invitation", { ids });
+      return await response.json();
+    },
+    onSuccess: (data: { successCount: number; errorCount: number }) => {
+      queryClient.invalidateQueries({ queryKey: ["/api/rsvp"] });
+      toast({
+        title: "Invitations envoyées",
+        description: `${data.successCount} envoyée(s), ${data.errorCount} échouée(s)`,
+      });
+      setSelectedIds([]);
+    },
+    onError: () => {
+      toast({ title: "Erreur", description: "Échec de l'envoi groupé.", variant: "destructive" });
+    },
+  });
+
+  const bulkSendReminderMutation = useMutation({
+    mutationFn: async (ids: number[]) => {
+      const response = await apiRequest("POST", "/api/rsvp/bulk-send-reminder", { ids });
+      return await response.json();
+    },
+    onSuccess: (data: { sent: number; failed: number }) => {
+      queryClient.invalidateQueries({ queryKey: ["/api/rsvp"] });
+      toast({
+        title: "Relances envoyées",
+        description: `${data.sent} envoyée(s), ${data.failed} échouée(s)`,
+      });
+      setSelectedIds([]);
+    },
+    onError: () => {
+      toast({ title: "Erreur", description: "Échec de l'envoi des relances.", variant: "destructive" });
+    },
+  });
+
+  const sendReminderMutation = useMutation({
+    mutationFn: async (id: number) => {
+      const response = await apiRequest("POST", `/api/rsvp/${id}/send-reminder`);
+      return await response.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/rsvp"] });
+      toast({ title: "Relance envoyée", description: "L'email de relance a bien été envoyé." });
+    },
+    onError: (err: any) => {
+      toast({ title: "Erreur", description: err.message || "Impossible d'envoyer la relance.", variant: "destructive" });
+    },
+  });
+
+  const toggleBrunchMutation = useMutation({
+    mutationFn: async (id: number) => {
+      return await apiRequest("POST", `/api/rsvp/${id}/toggle-brunch`);
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/rsvp"] });
+    },
+    onError: () => {
+      toast({ title: "Erreur", description: "Impossible de modifier le brunch", variant: "destructive" });
+    },
+  });
+
+  const buildInvitationName = (firstName: string, lastName: string, partySize: number): string => {
+    const couple = partySize >= 2;
+    const alreadyCouple = firstName.toLowerCase().startsWith("couple");
+    if (couple && !alreadyCouple) return `Couple ${lastName}`.trim();
+    if (couple && alreadyCouple) return firstName;
+    return `${firstName} ${lastName}`.trim();
+  };
+
+  const getGalaUrl = (response: RsvpResponse) => {
+    const name = buildInvitationName(response.firstName, response.lastName, response.partySize || 1);
+    const type = response.invitationType || 1;
+    const brunch = response.brunchInvited ? "&brunch=1" : "";
+    const table = response.tableNumber ? `&table=${response.tableNumber}` : "";
+    return `/gala/${encodeURIComponent(name)}?type=${type}${brunch}${table}`;
+  };
+
+  const getDot19Url = (response: RsvpResponse) => {
+    const name = buildInvitationName(response.firstName, response.lastName, response.partySize || 1);
+    return `/dot19/${encodeURIComponent(name)}`;
+  };
+
+  const copyGalaLink = async (response: RsvpResponse) => {
+    try {
+      const configRes = await fetch("/api/site-config");
+      const configData = await configRes.json();
+      const baseUrl = configData.siteUrl || window.location.origin;
+      const link = `${baseUrl}${getGalaUrl(response)}`;
+      await navigator.clipboard.writeText(link);
+      toast({ title: "Lien copié", description: link });
+    } catch {
+      toast({ title: "Erreur", description: "Impossible de copier le lien", variant: "destructive" });
+    }
+  };
+
+  const sendGalaInvitationMutation = useMutation({
+    mutationFn: async (id: number) => {
+      return await apiRequest("POST", `/api/rsvp/${id}/send-gala-invitation`);
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/rsvp"] });
+      toast({
+        title: "Invitation Gala envoyée",
+        description: "L'invitation gala a été envoyée par email",
+      });
+    },
+    onError: async (error: any) => {
+      if (isUnauthorizedError(error)) {
+        toast({ title: "Non autorisé", description: "Reconnexion...", variant: "destructive" });
+        setTimeout(() => { window.location.href = "/login"; }, 500);
+        return;
+      }
+      let errorMessage = "Impossible d'envoyer l'invitation gala";
+      try {
+        const errorData = await error.json?.();
+        if (errorData?.message) errorMessage = errorData.message;
+      } catch {}
+      toast({ title: "Erreur", description: errorMessage, variant: "destructive" });
     },
   });
 
@@ -653,7 +957,18 @@ export default function Admin() {
   // Reset page when filter changes
   useEffect(() => {
     setCurrentPage(1);
-  }, [searchQuery, filterAvailability]);
+  }, [searchQuery, filterAvailability, filterStatus, filterPartySize, filterTable, filterInvitationType]);
+
+  const activeFilterCount = [filterStatus, filterPartySize, filterAvailability, filterTable, filterInvitationType].filter(f => f !== "all").length;
+
+  const clearAllFilters = () => {
+    setFilterStatus("all");
+    setFilterPartySize("all");
+    setFilterAvailability("all");
+    setFilterTable("all");
+    setFilterInvitationType("all");
+    setSearchQuery("");
+  };
 
   // Filter responses
   const filteredResponses = responses.filter((response) => {
@@ -670,7 +985,22 @@ export default function Admin() {
       (filterAvailability === "19-march" && response.availability === "both") ||
       (filterAvailability === "21-march" && response.availability === "both");
 
-    return matchesSearch && matchesAvailability;
+    const matchesStatus =
+      filterStatus === "all" || response.status === filterStatus;
+
+    const matchesPartySize =
+      filterPartySize === "all" || response.partySize === parseInt(filterPartySize);
+
+    const matchesTable =
+      filterTable === "all" ||
+      (filterTable === "unassigned" && !response.tableNumber) ||
+      (filterTable === "assigned" && response.tableNumber !== null) ||
+      (filterTable !== "unassigned" && filterTable !== "assigned" && response.tableNumber === parseInt(filterTable));
+
+    const matchesInvitationType =
+      filterInvitationType === "all" || response.invitationType === parseInt(filterInvitationType);
+
+    return matchesSearch && matchesAvailability && matchesStatus && matchesPartySize && matchesTable && matchesInvitationType;
   });
 
   // Pagination
@@ -693,6 +1023,7 @@ export default function Admin() {
     march21: responses.filter(r => r.availability === '21-march').length,
     unavailable: responses.filter(r => r.availability === 'unavailable').length,
     assigned: responses.filter(r => r.tableNumber !== null).length,
+    viewed: responses.filter(r => r.invitationViewedAt).length,
   };
 
   if (!isAuthenticated && !isLoading) {
@@ -734,6 +1065,34 @@ export default function Admin() {
         {/* Dashboard Sections */}
         <div className="space-y-8">
           <DashboardWidgets responses={responses} onFilterChange={setFilterAvailability} />
+
+          {/* Site Settings */}
+          <Card className="p-4">
+            <div className="flex items-center justify-between gap-4 flex-wrap">
+              <div>
+                <h3 className="font-semibold text-sm">Montant de la cagnotte</h3>
+                <p className="text-xs text-muted-foreground mt-0.5">
+                  {cagnotteSettings?.visible !== false
+                    ? "Le total collecté est affiché sur la page /cagnotte"
+                    : "Le total collecté est masqué sur la page /cagnotte"}
+                </p>
+              </div>
+              <Button
+                variant={cagnotteSettings?.visible !== false ? "default" : "outline"}
+                size="sm"
+                onClick={() => toggleCagnotteMutation.mutate(!(cagnotteSettings?.visible !== false))}
+                disabled={toggleCagnotteMutation.isPending}
+                data-testid="button-toggle-cagnotte"
+                className="flex items-center gap-2"
+              >
+                {cagnotteSettings?.visible !== false ? (
+                  <><Eye className="h-4 w-4" /> Affiché</>
+                ) : (
+                  <><EyeOff className="h-4 w-4" /> Masqué</>
+                )}
+              </Button>
+            </div>
+          </Card>
 
           {/* Guest Management Section */}
           <Card className="flex flex-col">
@@ -893,68 +1252,78 @@ export default function Admin() {
                     </DialogContent>
                   </Dialog>
 
-                  <Dialog>
-                    <DialogTrigger asChild>
-                      <Button variant="secondary" className="flex-1 sm:flex-none">
-                        <Plus className="h-4 w-4 mr-2" />
-                        Importer liste
-                      </Button>
-                    </DialogTrigger>
-                    <DialogContent className="max-w-xl">
-                      <DialogHeader>
-                        <DialogTitle>Importer une liste d'invités</DialogTitle>
-                        <DialogDescription>
-                          Copiez-collez vos invités depuis Excel. Format attendu : 2 colonnes (Nom complet, Nombre de personnes).
-                        </DialogDescription>
-                      </DialogHeader>
-                      <ImportGuestForm onSuccess={() => {
-                        queryClient.invalidateQueries({ queryKey: ["/api/rsvp"] });
-                      }} />
-                    </DialogContent>
-                  </Dialog>
-
-                  <Button
-                    variant="outline"
-                    onClick={handleExportCSV}
-                    data-testid="button-export-csv"
-                    className="flex-1 sm:flex-none"
-                  >
-                    <Download className="h-4 w-4 mr-2" />
-                    Exporter CSV
-                  </Button>
-
                   {selectedIds.length > 0 && (
                     <>
                       <Button
                         variant="default"
-                        className="bg-green-600 hover:bg-green-700 text-white"
-                        onClick={() => bulkConfirmMutation.mutate(selectedIds)}
-                        disabled={bulkConfirmMutation.isPending}
-                        data-testid="button-bulk-confirm"
-                      >
-                        <Users className="h-4 w-4 mr-2" />
-                        Confirmer ({selectedIds.length})
-                      </Button>
-                      <Button
-                        variant="default"
                         className="bg-blue-600 hover:bg-blue-700 text-white"
-                        onClick={() => bulkSendInvitationMutation.mutate(selectedIds)}
-                        disabled={bulkSendInvitationMutation.isPending}
+                        onClick={() => bulkSendSmartInvitationMutation.mutate(selectedIds)}
+                        disabled={bulkSendSmartInvitationMutation.isPending}
                         data-testid="button-bulk-send-invitation"
                       >
                         <Send className="h-4 w-4 mr-2" />
-                        {bulkSendInvitationMutation.isPending ? "Envoi..." : `Invitations (${selectedIds.length})`}
+                        {bulkSendSmartInvitationMutation.isPending ? "Envoi..." : `Envoyer invitation (${selectedIds.length})`}
                       </Button>
                       <Button
                         variant="default"
-                        className="bg-orange-600 hover:bg-orange-700 text-white"
-                        onClick={() => bulkResendConfirmationMutation.mutate(selectedIds)}
-                        disabled={bulkResendConfirmationMutation.isPending}
-                        data-testid="button-bulk-resend-confirmation"
+                        className="bg-amber-600 hover:bg-amber-700 text-white"
+                        onClick={() => bulkSendReminderMutation.mutate(selectedIds)}
+                        disabled={bulkSendReminderMutation.isPending}
+                        data-testid="button-bulk-send-reminder"
                       >
-                        <RefreshCw className="h-4 w-4 mr-2" />
-                        {bulkResendConfirmationMutation.isPending ? "Envoi..." : `Confirmations (${selectedIds.length})`}
+                        <Bell className="h-4 w-4 mr-2" />
+                        {bulkSendReminderMutation.isPending ? "Envoi..." : `Envoyer relance (${selectedIds.length})`}
                       </Button>
+                      <Button
+                        variant="default"
+                        className="bg-violet-600 hover:bg-violet-700 text-white"
+                        onClick={() => bulkSendInvitation21Mutation.mutate(selectedIds)}
+                        disabled={bulkSendInvitation21Mutation.isPending}
+                        data-testid="button-bulk-send-inv21"
+                      >
+                        <CalendarDays className="h-4 w-4 mr-2" />
+                        {bulkSendInvitation21Mutation.isPending ? "Envoi..." : `Inv. 21 mars (${selectedIds.length})`}
+                      </Button>
+                      <Select
+                        onValueChange={(value) => {
+                          bulkInvitationTypeMutation.mutate({ ids: selectedIds, invitationType: parseInt(value) });
+                        }}
+                      >
+                        <SelectTrigger
+                          className="w-[200px] bg-purple-600 text-white border-purple-600"
+                          data-testid="select-bulk-invitation-type"
+                        >
+                          <SelectValue placeholder={`Type invitation (${selectedIds.length})`} />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="1">Type 1 - Complet</SelectItem>
+                          <SelectItem value="2">Type 2 - Bénédiction</SelectItem>
+                          <SelectItem value="3">Type 3 - Soirée</SelectItem>
+                          <SelectItem value="4">Type 4 - Mairie + Soirée</SelectItem>
+                        </SelectContent>
+                      </Select>
+                      <Select
+                        onValueChange={(value) => {
+                          bulkAssignTableMutation.mutate({ ids: selectedIds, tableNumber: value === "none" ? null : parseInt(value) });
+                        }}
+                      >
+                        <SelectTrigger
+                          className="w-[210px] bg-teal-600 text-white border-teal-600"
+                          data-testid="select-bulk-assign-table"
+                        >
+                          <SelectValue placeholder={`Attribuer table (${selectedIds.length})`} />
+                        </SelectTrigger>
+                        <SelectContent
+                          className="!max-h-[400px] overflow-y-auto"
+                        >
+                          <SelectItem value="none">— Retirer table</SelectItem>
+                          {WEDDING_TABLES.map(t => (
+                            <SelectItem key={t.number} value={String(t.number)}>
+                              Table {t.number} — {t.name}
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
                     </>
                   )}
 
@@ -1039,30 +1408,102 @@ export default function Admin() {
                 </div>
               </div>
 
-              <div className="flex flex-col md:flex-row gap-4">
-                <div className="relative flex-1">
-                  <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-                  <Input
-                    placeholder="Rechercher par nom, email..."
-                    value={searchQuery}
-                    onChange={(e) => setSearchQuery(e.target.value)}
-                    className="pl-10"
-                    data-testid="input-search-guest"
-                  />
+              <div className="flex flex-col gap-4">
+                <div className="flex flex-col md:flex-row gap-4">
+                  <div className="relative flex-1">
+                    <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+                    <Input
+                      placeholder="Rechercher par nom, email..."
+                      value={searchQuery}
+                      onChange={(e) => setSearchQuery(e.target.value)}
+                      className="pl-10"
+                      data-testid="input-search-guest"
+                    />
+                  </div>
+                  {activeFilterCount > 0 && (
+                    <Button variant="outline" onClick={clearAllFilters} data-testid="button-clear-filters">
+                      <X className="h-4 w-4 mr-2" />
+                      Effacer les filtres ({activeFilterCount})
+                    </Button>
+                  )}
                 </div>
-                <Select value={filterAvailability} onValueChange={setFilterAvailability}>
-                  <SelectTrigger className="w-full md:w-[240px]" data-testid="select-filter-availability">
-                    <SelectValue placeholder="Filtrer par statut" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="all">Tout le monde</SelectItem>
-                    <SelectItem value="pending">En attente (Non répondu)</SelectItem>
-                    <SelectItem value="both">Présents (Les deux dates)</SelectItem>
-                    <SelectItem value="19-march">Présents (19 mars)</SelectItem>
-                    <SelectItem value="21-march">Présents (21 mars)</SelectItem>
-                    <SelectItem value="unavailable">Absents</SelectItem>
-                  </SelectContent>
-                </Select>
+                <div className="flex flex-wrap gap-3">
+                  <Select value={filterStatus} onValueChange={setFilterStatus}>
+                    <SelectTrigger className="w-[170px]" data-testid="select-filter-status">
+                      <div className="flex items-center gap-2">
+                        <Filter className="h-3 w-3" />
+                        <SelectValue placeholder="Statut" />
+                      </div>
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="all">Tous les statuts</SelectItem>
+                      <SelectItem value="confirmed">Confirmé</SelectItem>
+                      <SelectItem value="pending">En attente</SelectItem>
+                    </SelectContent>
+                  </Select>
+                  <Select value={filterPartySize} onValueChange={setFilterPartySize}>
+                    <SelectTrigger className="w-[170px]" data-testid="select-filter-party-size">
+                      <div className="flex items-center gap-2">
+                        <Filter className="h-3 w-3" />
+                        <SelectValue placeholder="Personnes" />
+                      </div>
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="all">Toutes tailles</SelectItem>
+                      <SelectItem value="1">Solo (1)</SelectItem>
+                      <SelectItem value="2">Couple (2)</SelectItem>
+                    </SelectContent>
+                  </Select>
+                  <Select value={filterAvailability} onValueChange={setFilterAvailability}>
+                    <SelectTrigger className="w-[210px]" data-testid="select-filter-availability">
+                      <div className="flex items-center gap-2">
+                        <Filter className="h-3 w-3" />
+                        <SelectValue placeholder="Disponibilité" />
+                      </div>
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="all">Toutes disponibilités</SelectItem>
+                      <SelectItem value="pending">En attente</SelectItem>
+                      <SelectItem value="both">Les deux dates</SelectItem>
+                      <SelectItem value="19-march">19 mars</SelectItem>
+                      <SelectItem value="21-march">21 mars</SelectItem>
+                      <SelectItem value="unavailable">Indisponible</SelectItem>
+                    </SelectContent>
+                  </Select>
+                  <Select value={filterTable} onValueChange={setFilterTable}>
+                    <SelectTrigger className="w-[200px]" data-testid="select-filter-table">
+                      <div className="flex items-center gap-2">
+                        <Filter className="h-3 w-3" />
+                        <SelectValue placeholder="Table" />
+                      </div>
+                    </SelectTrigger>
+                    <SelectContent className="!max-h-[400px] overflow-y-auto">
+                      <SelectItem value="all">Toutes les tables</SelectItem>
+                      <SelectItem value="assigned">Avec table</SelectItem>
+                      <SelectItem value="unassigned">Sans table</SelectItem>
+                      {WEDDING_TABLES.map(t => (
+                        <SelectItem key={t.number} value={t.number.toString()}>
+                          Table {t.number} - {t.name}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                  <Select value={filterInvitationType} onValueChange={setFilterInvitationType}>
+                    <SelectTrigger className="w-[180px]" data-testid="select-filter-invitation-type">
+                      <div className="flex items-center gap-2">
+                        <Filter className="h-3 w-3" />
+                        <SelectValue placeholder="Type" />
+                      </div>
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="all">Tous les types</SelectItem>
+                      <SelectItem value="1">Type 1 - Complet</SelectItem>
+                      <SelectItem value="2">Type 2 - Bénédiction</SelectItem>
+                      <SelectItem value="3">Type 3 - Soirée</SelectItem>
+                      <SelectItem value="4">Type 4 - Mairie + Soirée</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
               </div>
             </div>
 
@@ -1133,6 +1574,11 @@ export default function Admin() {
                     <TableHead className="font-sans">Personnes</TableHead>
                     <TableHead className="font-sans">Disponibilité</TableHead>
                     <TableHead className="font-sans">Table attribuée</TableHead>
+                    <TableHead className="font-sans">Type</TableHead>
+                    <TableHead className="font-sans">Inv. 21</TableHead>
+                    <TableHead className="font-sans">Vu</TableHead>
+                    <TableHead className="font-sans">Brunch</TableHead>
+                    <TableHead className="font-sans">Plan</TableHead>
                     <TableHead className="font-sans">Commentaire</TableHead>
                     <TableHead
                       className="font-sans cursor-pointer hover:bg-muted/50 transition-colors"
@@ -1157,13 +1603,13 @@ export default function Admin() {
                 <TableBody>
                   {responsesLoading ? (
                     <TableRow>
-                      <TableCell colSpan={11} className="text-center py-8 text-muted-foreground">
+                      <TableCell colSpan={16} className="text-center py-8 text-muted-foreground">
                         Chargement...
                       </TableCell>
                     </TableRow>
                   ) : filteredResponses.length === 0 ? (
                     <TableRow>
-                      <TableCell colSpan={11} className="text-center py-8 text-muted-foreground">
+                      <TableCell colSpan={16} className="text-center py-8 text-muted-foreground">
                         Aucun invité trouvé
                       </TableCell>
                     </TableRow>
@@ -1293,7 +1739,7 @@ export default function Admin() {
                                           >
                                             <SelectValue placeholder="Choisir une table..." />
                                           </SelectTrigger>
-                                          <SelectContent className="max-h-[300px]">
+                                          <SelectContent className="!max-h-[400px] overflow-y-auto">
                                             {WEDDING_TABLES.map((table) => (
                                               <SelectItem 
                                                 key={table.number} 
@@ -1319,6 +1765,74 @@ export default function Admin() {
                               )}
                             </div>
                           </TableCell>
+                          <TableCell>
+                            <Select
+                              value={String(response.invitationType || 1)}
+                              onValueChange={(value) => {
+                                updateInvitationTypeMutation.mutate({ id: response.id, invitationType: parseInt(value) });
+                              }}
+                            >
+                              <SelectTrigger className="w-[70px] h-7 text-xs" data-testid={`select-invitation-type-${response.id}`}>
+                                <SelectValue />
+                              </SelectTrigger>
+                              <SelectContent>
+                                <SelectItem value="1">1</SelectItem>
+                                <SelectItem value="2">2</SelectItem>
+                                <SelectItem value="3">3</SelectItem>
+                                <SelectItem value="4">4</SelectItem>
+                              </SelectContent>
+                            </Select>
+                          </TableCell>
+                          <TableCell>
+                            {response.invitation21SentAt ? (
+                              <span className="inline-flex items-center gap-1 text-xs text-green-600 font-medium" data-testid={`text-inv21-status-${response.id}`}>
+                                <Check className="h-3 w-3" />
+                                {new Date(response.invitation21SentAt).toLocaleDateString('fr-FR', { day: '2-digit', month: 'short' })}
+                              </span>
+                            ) : (
+                              <span className="text-xs text-muted-foreground/50" data-testid={`text-inv21-status-${response.id}`}>-</span>
+                            )}
+                          </TableCell>
+                          <TableCell>
+                            {response.invitationViewedAt ? (
+                              <span className="inline-flex items-center gap-1 text-xs text-green-600 font-medium" data-testid={`text-viewed-status-${response.id}`}>
+                                <Eye className="h-3 w-3" />
+                                {new Date(response.invitationViewedAt).toLocaleDateString('fr-FR', { day: '2-digit', month: 'short' })}
+                              </span>
+                            ) : (
+                              <span className="text-xs text-muted-foreground/50" data-testid={`text-viewed-status-${response.id}`}>-</span>
+                            )}
+                          </TableCell>
+                          <TableCell>
+                            <button
+                              type="button"
+                              onClick={() => toggleBrunchMutation.mutate(response.id)}
+                              data-testid={`button-brunch-${response.id}`}
+                              title={response.brunchInvited ? "Retirer du brunch" : "Inviter au brunch"}
+                              className={`w-5 h-5 rounded border-2 flex items-center justify-center transition-colors ${
+                                response.brunchInvited
+                                  ? "bg-orange-400 border-orange-400 text-white"
+                                  : "border-muted-foreground/40 hover:border-orange-300"
+                              }`}
+                            >
+                              {response.brunchInvited && <Check className="h-3 w-3" />}
+                            </button>
+                          </TableCell>
+                          <TableCell>
+                            <button
+                              type="button"
+                              onClick={() => toggleSeatingMutation.mutate(response.id)}
+                              data-testid={`button-seating-check-${response.id}`}
+                              title={response.seatingConfirmed ? "Retiré du plan de table" : "Marqué comme placé sur le plan de table"}
+                              className={`w-5 h-5 rounded border-2 flex items-center justify-center transition-colors ${
+                                response.seatingConfirmed
+                                  ? "bg-amber-500 border-amber-500 text-white"
+                                  : "border-muted-foreground/40 hover:border-amber-400"
+                              }`}
+                            >
+                              {response.seatingConfirmed && <Check className="h-3 w-3" />}
+                            </button>
+                          </TableCell>
                           <TableCell className="max-w-[200px]">
                             {response.notes ? (
                               <span className="text-sm text-muted-foreground truncate block" title={response.notes}>
@@ -1340,67 +1854,120 @@ export default function Admin() {
                               {response.email && (
                                 <Button
                                   variant="ghost"
-                                  size="sm"
-                                  onClick={() => sendInvitationToGuestMutation.mutate(response.id)}
-                                  disabled={sendInvitationToGuestMutation.isPending}
-                                  className="text-blue-600 hover:text-blue-700 hover:bg-blue-50"
-                                  title="Envoyer invitation par email"
-                                  data-testid={`button-send-invitation-email-${response.id}`}
+                                  size="icon"
+                                  onClick={() => sendSmartInvitationMutation.mutate(response.id)}
+                                  disabled={sendSmartInvitationMutation.isPending}
+                                  title="Envoyer invitation"
+                                  className="text-amber-700 hover:text-amber-800 hover:bg-amber-50"
+                                  data-testid={`button-send-smart-invitation-${response.id}`}
                                 >
                                   <Send className="h-4 w-4" />
-                                </Button>
-                              )}
-                              {response.email && response.availability && response.availability !== 'pending' && (
-                                <Button
-                                  variant="ghost"
-                                  size="sm"
-                                  onClick={() => resendConfirmationMutation.mutate(response.id)}
-                                  disabled={resendConfirmationMutation.isPending}
-                                  className="text-orange-600 hover:text-orange-700 hover:bg-orange-50"
-                                  title="Renvoyer confirmation RSVP"
-                                  data-testid={`button-resend-confirmation-${response.id}`}
-                                >
-                                  <RefreshCw className="h-4 w-4" />
                                 </Button>
                               )}
                               {response.phone && (
                                 <Button
                                   variant="ghost"
-                                  size="sm"
-                                  onClick={() => whatsappMutation.mutate(response.id)}
-                                  className="text-green-600 hover:text-green-700 hover:bg-green-50"
-                                  title="Envoyer WhatsApp"
+                                  size="icon"
+                                  onClick={() => whatsappMutation.mutate({
+                                    id: response.id,
+                                    firstName: response.firstName,
+                                    lastName: response.lastName,
+                                    partySize: response.partySize || 1,
+                                  })}
+                                  disabled={whatsappMutation.isPending}
+                                  title={response.whatsappInvitationSentAt
+                                    ? `WhatsApp envoyé le ${new Date(response.whatsappInvitationSentAt).toLocaleDateString('fr-FR', { day: '2-digit', month: 'short' })} — Renvoyer ?`
+                                    : "Envoyer via WhatsApp"}
+                                  className={response.whatsappInvitationSentAt
+                                    ? "text-green-600 hover:text-green-700 hover:bg-green-50"
+                                    : "text-gray-400 hover:text-green-600 hover:bg-green-50"}
+                                  data-testid={`button-whatsapp-${response.id}`}
                                 >
-                                  <ExternalLink className="h-4 w-4" />
+                                  <MessageCircle className="h-4 w-4" />
+                                </Button>
+                              )}
+                              {response.email && (
+                                <Button
+                                  variant="ghost"
+                                  size="icon"
+                                  onClick={() => {
+                                    const type = (response.availability === "21-march" || response.availability === "both") ? "21" : "gala";
+                                    window.open(`/api/rsvp/${response.id}/email-preview?type=${type}`, '_blank');
+                                  }}
+                                  title="Aperçu email"
+                                  className="text-blue-600 hover:text-blue-700 hover:bg-blue-50"
+                                  data-testid={`button-email-preview-${response.id}`}
+                                >
+                                  <Mail className="h-4 w-4" />
+                                </Button>
+                              )}
+                              {response.email && (
+                                <Button
+                                  variant="ghost"
+                                  size="icon"
+                                  onClick={() => {
+                                    if (response.reminderSentAt) {
+                                      if (!window.confirm(`Relance déjà envoyée le ${new Date(response.reminderSentAt).toLocaleDateString('fr-BE')}. Renvoyer ?`)) return;
+                                    }
+                                    sendReminderMutation.mutate(response.id);
+                                  }}
+                                  title={response.reminderSentAt ? `Relance envoyée le ${new Date(response.reminderSentAt).toLocaleDateString('fr-BE')} — Renvoyer ?` : "Envoyer relance"}
+                                  className={response.reminderSentAt ? "text-amber-500 hover:text-amber-600 hover:bg-amber-50" : "text-gray-400 hover:text-amber-600 hover:bg-amber-50"}
+                                  data-testid={`button-send-reminder-${response.id}`}
+                                >
+                                  <Bell className="h-4 w-4" />
+                                </Button>
+                              )}
+                              {response.email && (
+                                <Button
+                                  variant="ghost"
+                                  size="icon"
+                                  onClick={() => {
+                                    if (response.invitation21SentAt) {
+                                      if (!window.confirm(`Invitation 21 déjà envoyée le ${new Date(response.invitation21SentAt).toLocaleDateString('fr-BE')}. Renvoyer ?`)) return;
+                                    }
+                                    sendInvitation21Mutation.mutate(response.id);
+                                  }}
+                                  title={response.invitation21SentAt ? `Inv. 21 envoyée le ${new Date(response.invitation21SentAt).toLocaleDateString('fr-BE')} — Renvoyer ?` : "Envoyer invitation 21 mars"}
+                                  className={response.invitation21SentAt ? "text-violet-500 hover:text-violet-600 hover:bg-violet-50" : "text-gray-400 hover:text-violet-600 hover:bg-violet-50"}
+                                  data-testid={`button-send-inv21-${response.id}`}
+                                >
+                                  <CalendarDays className="h-4 w-4" />
                                 </Button>
                               )}
                               <Button
                                 variant="ghost"
                                 size="icon"
                                 onClick={() => window.open(`/guest/${response.id}`, '_blank')}
-                                title="Voir les invitations"
+                                title="Voir invitation"
+                                className="text-amber-700 hover:text-amber-800 hover:bg-amber-50"
                                 data-testid={`button-view-invitation-${response.id}`}
                               >
                                 <Eye className="h-4 w-4" />
                               </Button>
                               <Button
                                 variant="ghost"
-                                size="sm"
+                                size="icon"
                                 onClick={() => {
                                   setEditingResponse(response);
                                   setEditDialogOpen(true);
                                 }}
+                                title="Modifier"
+                                className="text-muted-foreground hover:text-foreground"
+                                data-testid={`button-edit-${response.id}`}
                               >
                                 <Edit className="h-4 w-4" />
                               </Button>
                               <Button
                                 variant="ghost"
-                                size="sm"
-                                className="text-destructive hover:text-destructive"
+                                size="icon"
+                                className="text-red-500 hover:text-red-600 hover:bg-red-50"
                                 onClick={() => {
                                   setDeletingId(response.id);
                                   setDeleteDialogOpen(true);
                                 }}
+                                title="Supprimer"
+                                data-testid={`button-delete-${response.id}`}
                               >
                                 <Trash2 className="h-4 w-4" />
                               </Button>
@@ -1425,10 +1992,11 @@ export default function Admin() {
                       <SelectValue />
                     </SelectTrigger>
                     <SelectContent>
-                      <SelectItem value="10">10</SelectItem>
                       <SelectItem value="20">20</SelectItem>
                       <SelectItem value="50">50</SelectItem>
                       <SelectItem value="100">100</SelectItem>
+                      <SelectItem value="200">200</SelectItem>
+                      <SelectItem value="300">300</SelectItem>
                     </SelectContent>
                   </Select>
                 </div>

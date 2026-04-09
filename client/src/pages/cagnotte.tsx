@@ -5,7 +5,6 @@ import { useMutation, useQuery } from "@tanstack/react-query";
 import { Gift, Heart, CreditCard, Loader2, ArrowLeft, MessageCircle } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
-import type { Contribution } from "@shared/schema";
 import {
   Form,
   FormControl,
@@ -20,6 +19,7 @@ import { useToast } from "@/hooks/use-toast";
 import { apiRequest } from "@/lib/queryClient";
 import { z } from "zod";
 import { Link } from "wouter";
+import { type Contribution } from "@shared/schema";
 import couplePhoto from "@assets/DSC_8913_1766077508558.jpg";
 
 const contributionFormSchema = z.object({
@@ -92,62 +92,51 @@ function Countdown() {
   );
 }
 
-interface LiveData {
-  total: number;
-  currency: string;
-  recent: Contribution[];
-}
 
-function AnimatedMessages({ messages }: { messages: Contribution[] }) {
+function AnimatedMessages({ messages }: { messages: string[] }) {
   const [currentIndex, setCurrentIndex] = useState(0);
   const [isVisible, setIsVisible] = useState(true);
 
-  const messagesWithContent = messages.filter(m => m.message && m.message.trim());
-
   useEffect(() => {
-    if (messagesWithContent.length === 0) return;
+    if (messages.length <= 1) return;
 
     const interval = setInterval(() => {
       setIsVisible(false);
       setTimeout(() => {
-        setCurrentIndex((prev) => (prev + 1) % messagesWithContent.length);
+        setCurrentIndex((prev) => (prev + 1) % messages.length);
         setIsVisible(true);
       }, 500);
     }, 5000);
 
     return () => clearInterval(interval);
-  }, [messagesWithContent.length]);
+  }, [messages.length]);
 
-  if (messagesWithContent.length === 0) return null;
-
-  const current = messagesWithContent[currentIndex];
+  if (messages.length === 0) return null;
 
   return (
-    <div className="py-6 px-4 bg-primary/5 rounded-lg border border-primary/10 mb-8">
-      <div className="flex items-center justify-center gap-2 text-sm text-muted-foreground mb-4">
-        <MessageCircle className="h-4 w-4 text-primary" />
-        <span>Messages de nos contributeurs</span>
+    <div className="py-8 px-6 bg-gradient-to-br from-primary/10 via-primary/5 to-background rounded-xl border border-primary/20 mb-8 shadow-sm">
+      <div className="flex items-center justify-center gap-2 text-sm font-medium text-primary/80 mb-6">
+        <MessageCircle className="h-4 w-4" />
+        <span className="uppercase tracking-wider">Leurs messages d'affection</span>
+        <MessageCircle className="h-4 w-4" />
       </div>
-      <div 
-        className={`text-center transition-all duration-500 ${
-          isVisible ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-2'
-        }`}
+      <div
+        className={`text-center transition-all duration-500 ${isVisible ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-2'
+          }`}
       >
-        <p className="text-lg italic text-foreground/80 mb-2">
-          "{current.message}"
-        </p>
-        <p className="text-sm text-primary font-medium">
-          — {current.donorName}
+        <p className="text-lg md:text-xl font-serif italic text-foreground/90 leading-relaxed px-4">
+          « {messages[currentIndex]} »
         </p>
       </div>
-      {messagesWithContent.length > 1 && (
-        <div className="flex justify-center gap-1 mt-4">
-          {messagesWithContent.map((_, idx) => (
+      {messages.length > 1 && (
+        <div className="flex justify-center gap-1.5 mt-6">
+          {messages.map((_, idx) => (
             <div
               key={idx}
-              className={`w-2 h-2 rounded-full transition-colors ${
-                idx === currentIndex ? 'bg-primary' : 'bg-primary/20'
-              }`}
+              className={`h-1.5 rounded-full transition-all duration-300 ${idx === currentIndex
+                ? 'bg-primary w-8'
+                : 'bg-primary/20 w-1.5'
+                }`}
             />
           ))}
         </div>
@@ -160,13 +149,25 @@ export default function CagnottePage() {
   const { toast } = useToast();
   const [selectedAmount, setSelectedAmount] = useState<number | null>(null);
 
+  const { data: cagnotteSettings } = useQuery<{ visible: boolean }>({
+    queryKey: ["/api/settings/cagnotte-visible"],
+  });
+
   const { data: totalData } = useQuery<{ total: number; currency: string }>({
     queryKey: ["/api/contributions/total"],
   });
 
-  const { data: liveData } = useQuery<LiveData>({
-    queryKey: ["/api/contributions/live"],
+  const { data: contributions } = useQuery<Contribution[]>({
+    queryKey: ["/api/contributions/confirmed"],
+    queryFn: async () => {
+      const response = await apiRequest("GET", "/api/contributions/confirmed");
+      return response.json();
+    },
   });
+
+  const messages = contributions
+    ?.map(c => c.message)
+    .filter((m): m is string => !!m && m.length > 0) || [];
 
   const form = useForm<ContributionFormValues>({
     resolver: zodResolver(contributionFormSchema),
@@ -217,6 +218,8 @@ export default function CagnottePage() {
     }).format(cents / 100);
   };
 
+  const showAmount = cagnotteSettings?.visible !== false;
+
   return (
     <div className="min-h-screen bg-background">
       <div className="relative">
@@ -263,7 +266,7 @@ export default function CagnottePage() {
               <Countdown />
             </div>
 
-            {totalData && totalData.total > 0 && (
+            {showAmount && totalData && totalData.total > 0 && (
               <div className="text-center mb-8 py-4 px-6 bg-primary/5 rounded-lg border border-primary/10">
                 <div className="flex items-center justify-center gap-2 text-sm text-muted-foreground mb-1">
                   <Heart className="h-4 w-4 text-primary" />
@@ -275,9 +278,7 @@ export default function CagnottePage() {
               </div>
             )}
 
-            {liveData && liveData.recent && liveData.recent.length > 0 && (
-              <AnimatedMessages messages={liveData.recent} />
-            )}
+            <AnimatedMessages messages={messages} />
 
             <Form {...form}>
               <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-6">
@@ -306,7 +307,7 @@ export default function CagnottePage() {
                   <FormLabel className="text-sm font-sans uppercase tracking-wider text-foreground block">
                     Montant de votre contribution *
                   </FormLabel>
-                  
+
                   <div className="flex flex-wrap gap-2">
                     {suggestedAmounts.map((amount) => (
                       <Button
@@ -327,8 +328,8 @@ export default function CagnottePage() {
                     name="amount"
                     render={({ field }) => (
                       <FormItem>
-                        <FormLabel className="text-xs text-muted-foreground">
-                          Ou entrez un montant personnalisé (en euros)
+                        <FormLabel className="text-sm font-medium text-foreground">
+                          Ou entrez un montant libre
                         </FormLabel>
                         <FormControl>
                           <div className="relative">
@@ -336,8 +337,8 @@ export default function CagnottePage() {
                               type="number"
                               min="1"
                               step="1"
-                              placeholder="Montant en euros"
-                              className="h-12 border-border/50 focus:border-primary bg-background/50 pr-12"
+                              placeholder="0"
+                              className="h-16 text-2xl font-serif text-center border-2 border-primary/30 focus:border-primary bg-primary/5 pr-10 pl-4 rounded-lg"
                               data-testid="input-custom-amount"
                               {...field}
                               onChange={(e) => {
@@ -345,7 +346,7 @@ export default function CagnottePage() {
                                 setSelectedAmount(null);
                               }}
                             />
-                            <span className="absolute right-4 top-1/2 -translate-y-1/2 text-muted-foreground">
+                            <span className="absolute right-4 top-1/2 -translate-y-1/2 text-lg font-serif text-primary/60">
                               €
                             </span>
                           </div>

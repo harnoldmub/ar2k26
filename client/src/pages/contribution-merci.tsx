@@ -31,6 +31,12 @@ export default function ContributionMerci() {
     queryKey: ["/api/contributions/total"],
   });
 
+  const { data: cagnotteSettings } = useQuery<{ visible: boolean }>({
+    queryKey: ["/api/settings/cagnotte-visible"],
+  });
+
+  const showAmount = cagnotteSettings?.visible !== false;
+
   const formatAmount = (cents: number) => {
     return new Intl.NumberFormat("fr-FR", {
       style: "currency",
@@ -88,7 +94,7 @@ export default function ContributionMerci() {
               Votre geste contribue à rendre notre union encore plus spéciale.
             </p>
 
-            {totalData && totalData.total > 0 && (
+            {showAmount && totalData && totalData.total > 0 && (
               <div className="pt-6 border-t border-border/50">
                 <div className="flex items-center justify-center gap-2 text-sm text-muted-foreground mb-2">
                   <Gift className="h-4 w-4" />

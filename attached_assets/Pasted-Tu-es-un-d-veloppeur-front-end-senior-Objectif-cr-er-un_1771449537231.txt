@@ -1,0 +1,77 @@
+Tu es un développeur front-end senior. 
+Objectif : créer une invitation de mariage en HTML (1 page) au style luxueux NOIR + touches DORÉES, très proche du visuel fourni (fond noir profond, effets de “pluie lumineuse / particules”, typographie élégante, lignes dorées, ambiance premium).
+
+Contraintes
+- 1 seule page (one-page), mobile-first, responsive desktop.
+- Pas de section RSVP, pas de formulaire.
+- Couleurs : noir/charbon (#0B0B0B / #111111), texte doré (#C8A24A) + blanc cassé (#F2F2F2). 
+- Design : premium, minimal, beaucoup d’espace, séparateurs dorés fins.
+- Pas de framework. Autorisé : Google Fonts.
+- Livrer: index.html + styles.css + app.js (effet particules/pluie en CSS/JS léger) + dossier /assets.
+- Prévoir placeholders d’images:
+  - /assets/couple.jpg (photo du couple en bas comme l’exemple, avec overlay)
+  - /assets/bg.jpg (optionnel si tu utilises une image de fond)
+- Animation légère: fade-in au scroll, et effet “gold rain” (particules verticales) en CSS + JS.
+
+Contenu (UNIQUEMENT 21 mars)
+- Titre: Ruth & Arnold
+- Intro (court, élégant):
+  "Notre amour s’écrit en lettres d’or…
+   Nous vous invitons à partager la célébration de notre mariage."
+- Programme (timeline vertical centre, comme sur l’image):
+  1) Mairie — 10h45
+     Maison communale de Rhode-Saint-Genèse
+     Rue du Village 46, 1640 Rhode-Saint-Genèse, Belgique
+
+  2) Mariage — 12h45
+     Avenue du Bois des Collines 3
+     1420 Braine-l'Alleud, Belgique
+
+  3) Soirée — 19h30
+     Yeni Yasam
+     Dobbelenbergstraat 107
+     1130 Bruxelles, Belgique
+
+- Message ambiance (haut de page 2 sur l’exemple mais ici sur la même page):
+  "Nous nous réjouissons de partager ce moment avec vous.
+   Apportez votre bonne humeur, préparez vos plus beaux pas de danse."
+
+- Section “Cadeau de mariage”:
+  "Votre présence est notre plus beau cadeau.
+   Si vous souhaitez nous gâter, nous préférons une participation à notre cagnotte."
+  Lien: https://ar2k26.com/cagnotte
+  (bouton doré + affichage du lien en dessous)
+
+- Section “Dress code” (obligatoire):
+  Titre: DRESS CODE
+  Texte: "Tenue : Gala (chic & classe)"
+  Ajouter 3 pastilles de couleur optionnelles: Noir / Or / Champagne
+
+- Section “Notes”:
+  "Pour des raisons d’organisation, nous vous remercions de ne pas inviter de personnes supplémentaires."
+
+- Footer:
+  "© 2026 Ruth & Arnold — Golden Love"
+
+UI / Mise en page (à reproduire proche)
+- Fond noir avec “gold rain” animé (traits lumineux qui tombent lentement) + quelques particules.
+- Texte centré, hiérarchie:
+  - Titres en serif (Playfair Display ou Cinzel)
+  - Sous-textes en sans serif (Inter)
+- Ligne dorée fine après “Bonjour” et entre sections.
+- Programme en colonne centrale avec séparateurs et pastilles (timeline).
+- Photo du couple en bas (gauche homme / droite femme) style découpe/overlay comme l’invitation.
+  Si pas possible, afficher une grande photo en bas avec overlay noir + dégradé.
+- Boutons: doré, hover léger, arrondi.
+
+Livrables
+- Fournir les 3 fichiers complets:
+  - index.html
+  - styles.css
+  - app.js
+- Inclure des commentaires indiquant où remplacer les images.
+- Assurer que ça fonctionne en ouvrant index.html (pas besoin de serveur).
+
+Qualité
+- Très propre, moderne, “luxury wedding”, aucun contenu du 19 mars.
+- Orthographe parfaite en français.

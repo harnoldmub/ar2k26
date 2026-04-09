@@ -15,6 +15,15 @@ import CagnottePage from "@/pages/cagnotte";
 import ContributionMerci from "@/pages/contribution-merci";
 import LiveContributions from "@/pages/live-contributions";
 import GuestInvitation from "@/pages/dot-invitation";
+import InvitationGala from "@/pages/invitation-gala";
+import InvitationDot19 from "@/pages/invitation-dot19";
+import DeclineConfirmed from "@/pages/decline-confirmed";
+import RsvpConfirmed from "@/pages/rsvp-confirmed";
+import RsvpConfirmChoice from "@/pages/rsvp-confirm-choice";
+import GiftListSignup from "@/pages/gift-list-signup";
+import GiftListMC from "@/pages/gift-list-mc";
+import Programme from "@/pages/programme";
+import Accueil from "@/pages/accueil";
 import NotFound from "@/pages/not-found";
 
 function Router() {
@@ -38,6 +47,15 @@ function Router() {
       <Route path="/cagnotte/live" component={LiveContributions} />
       <Route path="/contribution/merci" component={ContributionMerci} />
       <Route path="/guest/:guestId" component={GuestInvitation} />
+      <Route path="/gala/:name?" component={InvitationGala} />
+      <Route path="/dot19/:name?" component={InvitationDot19} />
+      <Route path="/decline-confirmed" component={DeclineConfirmed} />
+      <Route path="/rsvp-confirmed" component={RsvpConfirmed} />
+      <Route path="/rsvp-confirm-choice" component={RsvpConfirmChoice} />
+      <Route path="/liste-cadeaux" component={GiftListSignup} />
+      <Route path="/liste-cadeaux/mc" component={GiftListMC} />
+      <Route path="/programme" component={Programme} />
+      <Route path="/accueil" component={Accueil} />
       <Route path="/admin">
         {isLoading ? (
           <div className="min-h-screen flex items-center justify-center">

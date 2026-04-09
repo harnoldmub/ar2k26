@@ -1,0 +1,62 @@
+Tu es un intégrateur web senior spécialisé en landing pages “invitation” premium.
+
+Objectif :
+Créer une invitation mariage en HTML/CSS (sans framework) qui reproduit le style de l’invitation fournie :
+- format vertical mobile (type story 9:16), centrée, max-width 420px, pleine hauteur
+- ambiance “papier ivoire / mariage chic” avec éléments floraux légers
+- haut de page : un motif tissu (je vais fournir l’image) en bandeau
+- en dessous : une zone blanche/papier avec effet “bord déchiré / vague” en haut et en bas (comme Canva)
+- typographie : mélange serif élégant + écriture script pour les prénoms
+- couleurs : bronze / gold doux (#8a6a3a ou équivalent), beige clair, gris très léger pour le fond
+
+Livrables :
+1) index.html
+2) styles.css
+3) dossier /assets avec des placeholders (images) + instructions dans un README court.
+
+Contraintes :
+- 100% responsive (mobile first)
+- code propre, commenté, accessible
+- pas de JS obligatoire (sauf si nécessaire pour le calendrier)
+- utiliser Google Fonts : 
+  - Script pour les prénoms : "Great Vibes" (ou "Allura")
+  - Serif pour le reste : "Playfair Display" + sans "Inter" pour petits textes
+- utiliser des SVG inline pour les petits pictos (église/lieu/horloge) afin d’éviter des images.
+
+Structure visuelle (dans la carte) :
+A. Met le logo AR
+B. Ligne : “Mme, Mlle, M., Couple”
+C. La ligne destinataire doit être dynamique.
+Le nom du destinataire doit être récupéré dans l’URL via un paramètre GET.D. Noms en grand (script) : “Ruth & Arnold”
+E. Texte : “ont le réel plaisir de vous convier à la célébration de leur mariage coutumier qui aura lieu le 19 mars 2026.”
+F. Bloc “SAVE the date” + mini calendrier Mars 2026 avec le 19 entouré (pastille).
+G. Bloc infos lieu :
+   - Titre : “Soirée dansante”
+   - Lieu : “Yeni Yasam”
+   - Adresse : “Dahlembergstraat 107, 1130 Brussel, Belgique”
+   - Bouton bronze arrondi : “Cliquer ici pour voir le lieu” (lien Google Maps en placeholder)
+H. Bloc heure :
+   - pictogramme horloge à gauche
+   - texte manuscrit à droite “19H00”
+I. Texte de fin : “Cordiale bienvenue !”
+J. Bas de page : une photo/texture en background (placeholder) + monogramme en cercle au centre.
+
+Images / assets :
+- /assets/motif-top.png (je vais fournir) => bandeau tout en haut
+- Les fleurs peuvent être simulées en background via pseudo-éléments (SVG inline ou PNG placeholders), mais fais simple et élégant.
+
+Important :
+- Crée un style très proche de Canva : beaucoup d’air, centrage, lignes fines, séparateurs discrets
+- Prévois un système de variables CSS (:root) pour couleurs, polices, espacements
+- Prévois une section “data” en haut du HTML avec les infos à modifier facilement (noms, date, lieu, lien maps).
+
+Contraintes :
+
+- site mobile first
+- max width 420px
+- style invitation mariage premium
+- couleurs beige / gold
+- Google Fonts :
+  Playfair Display
+  Great Vibes
+Génère le code complet maintenant.

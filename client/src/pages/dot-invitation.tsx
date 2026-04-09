@@ -2,7 +2,7 @@ import { useParams } from "wouter";
 import { useQuery } from "@tanstack/react-query";
 import { useState, useEffect } from "react";
 import { Button } from "@/components/ui/button";
-import { Loader2, Download, Calendar, Heart, Users, Clock, Gift } from "lucide-react";
+import { Loader2, Download, Calendar, Heart, Users, Clock, Gift, ExternalLink, UtensilsCrossed } from "lucide-react";
 import logoRA from "@/assets/logo-ra.png";
 
 interface GuestData {
@@ -11,8 +11,27 @@ interface GuestData {
   lastName: string;
   availability: string;
   partySize: number;
+  invitationType: number;
+  tableNumber: number | null;
+  brunchInvited: boolean;
   pdfUrl: string | null;
 }
+
+const WEDDING_TABLES: Record<number, string> = {
+  1: "Amour Éternel", 2: "Âmes Sœurs", 3: "Promesse Dorée", 4: "Alliance Sacrée",
+  5: "Coup de Foudre", 6: "Grâce Divine", 7: "Cœurs Unis", 8: "Passion d'Or",
+  9: "Serment Éternel", 10: "Flamme d'Amour", 11: "Harmonie Dorée", 12: "Union Parfaite",
+  13: "Destin Doré", 14: "Éclat de Bonheur", 15: "Joyau Précieux", 16: "Couronne d'Amour",
+  17: "Lien Sacré", 18: "Origine Divine", 19: "Héritage d'Amour", 20: "Lumière Éternelle",
+  21: "Cantique d'Amour", 22: "Main dans la Main", 23: "Promesse Céleste", 24: "Trésor du Cœur",
+  25: "Éternelle Allégresse", 26: "Souffle d'Or", 27: "Chemin de Grâce", 28: "Amour Triomphant",
+  29: "Scellement Divin", 30: "Rayon de Gloire", 31: "Serment Sacré", 32: "Éternelle Promesse",
+  33: "Chemin d'Amour", 34: "Couronne de Gloire", 35: "Union Glorieuse", 36: "Amour Véritable",
+  37: "Source de Joie", 38: "Alliance Éternelle", 39: "Horizon d'Amour", 40: "Golden Love",
+  41: "Jardin d'Amour", 42: "Promesse Éternelle", 43: "Grâce Infinie", 44: "Lumière d'Amour",
+  45: "Alliance de Vie", 46: "Cœur Fidèle", 47: "Chemin d'Éternité", 48: "Étreinte Divine",
+  49: "Serment d'Amour", 50: "Gloire d'Amour", 51: "Amour Accompli", 52: "Lumière de Grâce",
+};
 
 function Countdown({ targetDate }: { targetDate: Date }) {
   const [timeLeft, setTimeLeft] = useState({
@@ -76,6 +95,12 @@ export default function GuestInvitationPage() {
     enabled: !!guestId,
   });
 
+  useEffect(() => {
+    if (guestId) {
+      fetch(`/api/invitation/guest/${guestId}/track-view`, { method: "POST" }).catch(() => {});
+    }
+  }, [guestId]);
+
   if (isLoading) {
     return (
       <div className="min-h-screen bg-[#0a0a12] flex items-center justify-center">
@@ -97,6 +122,17 @@ export default function GuestInvitationPage() {
   const showMarch19 = guest.availability === "19-march" || guest.availability === "both";
   const showMarch21 = guest.availability === "21-march" || guest.availability === "both";
   const isCouple = guest.partySize >= 2;
+
+  const buildInvitationName = (firstName: string, lastName: string, partySize: number) => {
+    const couple = partySize >= 2;
+    const alreadyCouple = firstName.toLowerCase().startsWith("couple");
+    if (couple && !alreadyCouple) return `Couple ${lastName}`.trim();
+    if (couple && alreadyCouple) return firstName;
+    return `${firstName} ${lastName}`.trim();
+  };
+
+  const displayName = buildInvitationName(guest.firstName, guest.lastName, guest.partySize);
+  const invitationName = encodeURIComponent(displayName);
 
   // Determine the countdown target date based on availability
   const getCountdownDate = () => {
@@ -174,11 +210,22 @@ export default function GuestInvitationPage() {
             </div>
             
             <h2 className="text-2xl font-serif text-white">
-              {guest.firstName} {guest.lastName}
+              {displayName}
             </h2>
             <p className="text-amber-200/50 text-sm mt-1">
               {isCouple ? "2 personnes" : "1 personne"}
             </p>
+
+            {guest.tableNumber && (
+              <div className="mt-3 pt-3 border-t border-amber-500/15">
+                <div className="flex items-center justify-center gap-2">
+                  <UtensilsCrossed className="w-3.5 h-3.5 text-amber-400" />
+                  <span className="text-amber-300 text-xs uppercase tracking-wider">
+                    Table {guest.tableNumber}{WEDDING_TABLES[guest.tableNumber] ? ` — ${WEDDING_TABLES[guest.tableNumber]}` : ""}
+                  </span>
+                </div>
+              </div>
+            )}
           </div>
 
           {/* Countdown */}
@@ -209,15 +256,19 @@ export default function GuestInvitationPage() {
                   </Button>
                 ) : (
                   <Button
-                    disabled
-                    className="w-full bg-gray-800 text-gray-500 font-medium h-14 text-base rounded-xl cursor-not-allowed border border-gray-700"
-                    data-testid="button-download-19-disabled"
+                    asChild
+                    className="w-full bg-gradient-to-r from-amber-500 to-amber-600 hover:from-amber-600 hover:to-amber-700 text-black font-semibold h-14 text-base rounded-xl"
+                    data-testid="button-dot19-invitation"
                   >
-                    <Calendar className="w-5 h-5 mr-3" />
-                    19 Mars 2026
-                    <span className="ml-3 text-xs bg-amber-500/20 text-amber-400 px-2 py-0.5 rounded">
-                      Bientôt
-                    </span>
+                    <a
+                      href={`/dot19/${invitationName}`}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                    >
+                      <Calendar className="w-5 h-5 mr-3" />
+                      19 Mars 2026
+                      <ExternalLink className="w-4 h-4 ml-3" />
+                    </a>
                   </Button>
                 )}
               </div>
@@ -229,16 +280,47 @@ export default function GuestInvitationPage() {
                   Mariage Civil & Religieux
                 </p>
                 <Button
-                  disabled
-                  className="w-full bg-gray-800 text-gray-500 font-medium h-14 text-base rounded-xl cursor-not-allowed border border-gray-700"
-                  data-testid="button-download-21"
+                  asChild
+                  className="w-full bg-gradient-to-r from-amber-500 to-amber-600 hover:from-amber-600 hover:to-amber-700 text-black font-semibold h-14 text-base rounded-xl"
+                  data-testid="button-invitation-21"
                 >
-                  <Calendar className="w-5 h-5 mr-3" />
-                  21 Mars 2026
-                  <span className="ml-3 text-xs bg-amber-500/20 text-amber-400 px-2 py-0.5 rounded">
-                    Coming soon
-                  </span>
+                  <a
+                    href={`/gala/${invitationName}?type=${guest.invitationType || 1}${guest.brunchInvited ? "&brunch=1" : ""}${guest.tableNumber ? `&table=${guest.tableNumber}` : ""}`}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                  >
+                    <Calendar className="w-5 h-5 mr-3" />
+                    21 Mars 2026
+                    <ExternalLink className="w-4 h-4 ml-3" />
+                  </a>
                 </Button>
+              </div>
+            )}
+
+            {guest.brunchInvited && (
+              <div>
+                <p className="text-amber-300/80 text-xs mb-2 uppercase tracking-widest">
+                  Brunch du lendemain
+                </p>
+                <div
+                  className="w-full rounded-xl border border-amber-500/30 bg-amber-500/5 p-4 text-left"
+                  data-testid="section-brunch-info"
+                >
+                  <div className="flex items-center gap-2 mb-2">
+                    <UtensilsCrossed className="w-4 h-4 text-amber-400 flex-shrink-0" />
+                    <span className="text-amber-300 font-semibold text-sm">Dimanche 22 mars — 14h30 – 17h30</span>
+                  </div>
+                  <p className="text-amber-200/70 text-xs leading-relaxed">
+                    <span className="font-medium text-amber-200/90">KAUA</span>
+                    <br />Place Saint-Job, Uccle
+                  </p>
+                  <p className="text-amber-300 text-sm font-semibold mt-2">
+                    25€ par personne
+                  </p>
+                  <p className="text-amber-200/50 text-xs mt-1">
+                    Places limitées — sur invitation uniquement
+                  </p>
+                </div>
               </div>
             )}
 

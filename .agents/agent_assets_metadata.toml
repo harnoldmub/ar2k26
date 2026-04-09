@@ -1,0 +1,8 @@
+uploads = []
+generated = []
+
+[[outputs]]
+id = "gX0-rL_TFHFLjprI3IP9U"
+uri = "file://plan-de-table.txt"
+type = "text"
+title = "Plan de table — Noms des tables"

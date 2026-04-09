@@ -1,5 +1,5 @@
 import { Card } from "@/components/ui/card";
-import { TrendingUp, Users, Calendar, CheckCircle, XCircle, Table2 } from "lucide-react";
+import { TrendingUp, Users, Calendar, CheckCircle, Table2, Eye, Tag, LayoutList } from "lucide-react";
 import {
   PieChart,
   Pie,
@@ -36,14 +36,27 @@ export function DashboardWidgets({ responses, onFilterChange }: DashboardWidgets
     totalGuests: responses.reduce((sum, r) => sum + r.partySize, 0),
     solo: responses.filter((r) => r.partySize === 1).length,
     couple: responses.filter((r) => r.partySize === 2).length,
+    viewed: responses.filter((r) => r.invitationViewedAt).length,
+    // Stats by invitation type (count of responses + total guests)
+    type1: responses.filter((r) => (r.invitationType || 1) === 1),
+    type2: responses.filter((r) => (r.invitationType || 1) === 2),
+    type3: responses.filter((r) => (r.invitationType || 1) === 3),
+    type4: responses.filter((r) => (r.invitationType || 1) === 4),
     // Stats for March 19
-    guests19: availableFor19.reduce((sum, r) => sum + r.partySize, 0),
     solo19: availableFor19.filter((r) => r.partySize === 1).length,
-    couple19: availableFor19.filter((r) => r.partySize === 2).length,
+    couple19: availableFor19.filter((r) => r.partySize >= 2).length,
+    guests19: availableFor19.reduce((sum, r) => sum + (r.partySize || 1), 0),
+    get invitations19() { return this.solo19 + this.couple19; },
     // Stats for March 21
-    guests21: availableFor21.reduce((sum, r) => sum + r.partySize, 0),
     solo21: availableFor21.filter((r) => r.partySize === 1).length,
-    couple21: availableFor21.filter((r) => r.partySize === 2).length,
+    couple21: availableFor21.filter((r) => r.partySize >= 2).length,
+    guests21: availableFor21.reduce((sum, r) => sum + (r.partySize || 1), 0),
+    get invitations21() { return this.solo21 + this.couple21; },
+    // Stats plan de table — seatingConfirmed, couple = 2 personnes
+    seatedInvitations: responses.filter((r) => r.seatingConfirmed).length,
+    seatedGuests: responses.filter((r) => r.seatingConfirmed).reduce((sum, r) => sum + (r.partySize || 1), 0),
+    get seatedSolo() { return responses.filter((r) => r.seatingConfirmed && r.partySize === 1).length; },
+    get seatedCouple() { return responses.filter((r) => r.seatingConfirmed && r.partySize >= 2).length; },
   };
   
   const totalMarch19 = stats.march19Only + stats.both;
@@ -103,9 +116,9 @@ export function DashboardWidgets({ responses, onFilterChange }: DashboardWidgets
       clickable: false,
     },
     {
-      title: "Présents le 19",
+      title: "Personnes le 19",
       value: stats.guests19,
-      description: `${stats.solo19} solo + ${stats.couple19} couples`,
+      description: `${stats.invitations19} invit. · ${stats.couple19} groupes + ${stats.solo19} solo`,
       icon: Calendar,
       color: "text-chart-2",
       bgColor: "bg-chart-2/10",
@@ -114,9 +127,9 @@ export function DashboardWidgets({ responses, onFilterChange }: DashboardWidgets
       clickable: true,
     },
     {
-      title: "Présents le 21",
+      title: "Personnes le 21",
       value: stats.guests21,
-      description: `${stats.solo21} solo + ${stats.couple21} couples`,
+      description: `${stats.invitations21} invit. · ${stats.couple21} groupes + ${stats.solo21} solo`,
       icon: Calendar,
       color: "text-chart-3",
       bgColor: "bg-chart-3/10",
@@ -124,12 +137,34 @@ export function DashboardWidgets({ responses, onFilterChange }: DashboardWidgets
       filter: "21-march",
       clickable: true,
     },
+    {
+      title: "Invitations vues",
+      value: stats.viewed,
+      description: `${stats.total > 0 ? Math.round((stats.viewed / stats.total) * 100) : 0}% ont ouvert`,
+      icon: Eye,
+      color: "text-chart-4",
+      bgColor: "bg-chart-4/10",
+      testId: "stat-invitations-viewed",
+      filter: null,
+      clickable: false,
+    },
+    {
+      title: "Dans le plan",
+      value: stats.seatedGuests,
+      description: `${stats.seatedInvitations} fiches · ${stats.seatedCouple} couples (×2) + ${stats.seatedSolo} solo`,
+      icon: LayoutList,
+      color: "text-chart-5",
+      bgColor: "bg-chart-5/10",
+      testId: "stat-seated-guests",
+      filter: null,
+      clickable: false,
+    },
   ];
 
   return (
     <div className="space-y-6">
       {/* KPI Cards Only */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-6 gap-4">
         {statCards.map((stat, idx) => {
           const Icon = stat.icon;
           const isClickable = stat.clickable && onFilterChange;
@@ -170,7 +205,7 @@ export function DashboardWidgets({ responses, onFilterChange }: DashboardWidgets
         })}
       </div>
 
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
         <Card className="p-6 col-span-1">
           <div className="flex items-center gap-2 mb-6">
             <div className="p-2 rounded-lg bg-primary/10">
@@ -257,6 +292,45 @@ export function DashboardWidgets({ responses, onFilterChange }: DashboardWidgets
                 <Legend verticalAlign="bottom" height={36} />
               </PieChart>
             </ResponsiveContainer>
+          </div>
+        </Card>
+
+        {/* Invitation Type Breakdown */}
+        <Card className="p-6 col-span-1">
+          <div className="flex items-center gap-2 mb-6">
+            <div className="p-2 rounded-lg bg-primary/10">
+              <Tag className="h-5 w-5 text-primary" />
+            </div>
+            <h3 className="font-serif font-semibold text-lg">Répartition par type</h3>
+          </div>
+          <div className="space-y-4">
+            {[
+              { label: "Type 1", desc: "Complet", rows: stats.type1, color: "bg-primary" },
+              { label: "Type 2", desc: "Bénédiction + Soirée", rows: stats.type2, color: "bg-chart-2" },
+              { label: "Type 3", desc: "Soirée uniquement", rows: stats.type3, color: "bg-chart-3" },
+              { label: "Type 4", desc: "Mairie + Soirée", rows: stats.type4, color: "bg-chart-4" },
+            ].map((t) => {
+              const guestCount = t.rows.reduce((sum, r) => sum + r.partySize, 0);
+              const pct = stats.total > 0 ? Math.round((t.rows.length / stats.total) * 100) : 0;
+              return (
+                <div key={t.label}>
+                  <div className="flex items-center justify-between mb-1">
+                    <div className="flex items-center gap-2">
+                      <span className={`w-2 h-2 rounded-full ${t.color}`} />
+                      <span className="text-sm font-medium font-sans">{t.label}</span>
+                      <span className="text-xs text-muted-foreground font-sans">{t.desc}</span>
+                    </div>
+                    <div className="flex items-center gap-3 text-sm font-sans">
+                      <span className="text-muted-foreground">{t.rows.length} fiches</span>
+                      <span className="font-semibold text-foreground">{guestCount} invités</span>
+                    </div>
+                  </div>
+                  <div className="w-full bg-muted rounded-full h-1.5">
+                    <div className={`h-1.5 rounded-full ${t.color}`} style={{ width: `${pct}%` }} />
+                  </div>
+                </div>
+              );
+            })}
           </div>
         </Card>
       </div>

@@ -409,7 +409,7 @@ function TimelineSection({ guest }: { guest: Guest }) {
                         <div className="relative max-w-md mx-auto">
                             <div className="absolute left-[60px] top-0 bottom-0 w-[2px] bg-[#D4AF37]/20" />
                             <div className="space-y-12">
-                                <TimelineItem time="10h00" title="Mairie - Cérémonie Civile" icon={MapPin} />
+                                <TimelineItem time="10h30" title="Mairie - Cérémonie Civile" icon={MapPin} />
                                 <TimelineItem time="12h00" title="Église - Cérémonie Religieuse" icon={ChurchIcon} />
                                 <TimelineItem time="15h00" title="Séance photo & Cocktail" icon={Camera} />
                                 <TimelineItem time="19h00" title="Réception & Dîner" icon={Utensils} />

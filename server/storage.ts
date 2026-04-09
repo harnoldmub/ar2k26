@@ -11,7 +11,7 @@ import {
   type InsertContribution,
 } from "@shared/schema";
 import { db } from "./db";
-import { eq, and, ne, sql } from "drizzle-orm";
+import { eq, and, ne, sql, asc } from "drizzle-orm";
 
 // Interface for storage operations
 export interface IStorage {
@@ -115,7 +115,7 @@ export class DatabaseStorage implements IStorage {
   }
 
   async getAllRsvpResponses(): Promise<RsvpResponse[]> {
-    return await db.select().from(rsvpResponses);
+    return await db.select().from(rsvpResponses).orderBy(asc(rsvpResponses.id));
   }
 
   async updateRsvpTableNumber(id: number, tableNumber: number | null): Promise<RsvpResponse> {

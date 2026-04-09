@@ -4,10 +4,21 @@ import crypto from "crypto";
 import { storage } from "./storage";
 import { getSession } from "./replitAuth";
 import { setupLocalAuth, isLocallyAuthenticated } from "./localAuth";
-import { insertRsvpResponseSchema, updateRsvpResponseSchema, insertContributionSchema } from "@shared/schema";
-import { sendRsvpConfirmationEmail, sendPersonalizedInvitation, sendGuestConfirmationEmail, sendContributionNotification, sendContributorThankYou, sendDateChangeApologyEmail } from "./email";
+import { insertRsvpResponseSchema, updateRsvpResponseSchema, insertContributionSchema, rsvpResponses, giftListSignups, insertGiftListSignupSchema } from "@shared/schema";
+import { eq, asc, sql } from "drizzle-orm";
+import { db } from "./db";
+import { sendRsvpConfirmationEmail, sendPersonalizedInvitation, sendGuestConfirmationEmail, sendContributionNotification, sendContributorThankYou, sendDateChangeApologyEmail, sendGalaInvitationEmail, sendInvitation21Email, buildGalaEmailHtml, buildInvitation21EmailHtml, sendReminderEmail, buildReminderEmailHtml } from "./email";
 import passport from "passport";
 import { getUncachableStripeClient, getStripePublishableKey } from "./stripeClient";
+
+/** Mirror of client-side buildInvitationName — keeps solo/couple naming consistent */
+function buildInvitationName(firstName: string, lastName: string, partySize: number): string {
+  const isCouple = partySize >= 2;
+  const alreadyCouple = firstName.toLowerCase().startsWith("couple");
+  if (isCouple && !alreadyCouple) return `Couple ${lastName}`.trim();
+  if (isCouple && alreadyCouple) return firstName.trim();
+  return `${firstName} ${lastName}`.trim();
+}
 
 export async function registerRoutes(app: Express): Promise<Server> {
   // Session middleware
@@ -106,7 +117,19 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.patch("/api/rsvp/:id", isLocallyAuthenticated, async (req, res) => {
     try {
       const id = parseInt(req.params.id);
-      const { tableNumber } = req.body;
+      const { tableNumber, invitationType } = req.body;
+      if (invitationType !== undefined) {
+        const parsed = parseInt(invitationType);
+        if ([1, 2, 3, 4].includes(parsed)) {
+          const [response] = await db
+            .update(rsvpResponses)
+            .set({ invitationType: parsed })
+            .where(eq(rsvpResponses.id, id))
+            .returning();
+          return res.json(response);
+        }
+        return res.status(400).json({ message: "Type d'invitation invalide (1, 2, 3 ou 4)" });
+      }
       const response = await storage.updateRsvpTableNumber(id, tableNumber);
       res.json(response);
     } catch (error) {
@@ -137,6 +160,19 @@ export async function registerRoutes(app: Express): Promise<Server> {
       
       const validated = updateRsvpResponseSchema.parse(req.body);
       console.log("PUT /api/rsvp/:id - Validated data:", JSON.stringify(validated, null, 2));
+
+      // Auto-sync: if admin sets availability to "unavailable", force status to "declined"
+      // If admin sets availability to an attending value and status was "declined", reset to "pending"
+      if (validated.availability === "unavailable" && validated.status !== "declined") {
+        validated.status = "declined";
+      } else if (
+        validated.availability &&
+        validated.availability !== "unavailable" &&
+        validated.status === "declined"
+      ) {
+        validated.status = "pending";
+      }
+
       const response = await storage.updateRsvpResponse(id, validated);
       
       // Check if availability changed from "both" to "21-march" only
@@ -202,6 +238,27 @@ export async function registerRoutes(app: Express): Promise<Server> {
     } catch (error) {
       console.error("Error bulk confirming:", error);
       res.status(500).json({ message: "Erreur lors de la confirmation" });
+    }
+  });
+
+  // Bulk Update Invitation Type
+  app.post("/api/rsvp/bulk-invitation-type", isLocallyAuthenticated, async (req, res) => {
+    try {
+      const { ids, invitationType } = req.body;
+      if (!Array.isArray(ids) || ![1, 2, 3, 4].includes(invitationType)) {
+        return res.status(400).json({ message: "Liste d'identifiants et type d'invitation (1, 2, 3 ou 4) requis" });
+      }
+
+      for (const id of ids) {
+        await db
+          .update(rsvpResponses)
+          .set({ invitationType })
+          .where(eq(rsvpResponses.id, id));
+      }
+      res.json({ success: true, count: ids.length });
+    } catch (error) {
+      console.error("Error bulk updating invitation type:", error);
+      res.status(500).json({ message: "Erreur lors de la mise à jour du type d'invitation" });
     }
   });
 
@@ -328,6 +385,249 @@ export async function registerRoutes(app: Express): Promise<Server> {
     res.json({ siteUrl });
   });
 
+  app.get("/api/settings/cagnotte-visible", async (_req, res) => {
+    try {
+      const result = await db.execute(sql`SELECT value FROM app_settings WHERE key = 'cagnotte_visible'`);
+      const value = (result.rows[0] as any)?.value ?? 'true';
+      res.json({ visible: value === 'true' });
+    } catch {
+      res.json({ visible: true });
+    }
+  });
+
+  app.post("/api/settings/cagnotte-visible", isLocallyAuthenticated, async (req, res) => {
+    try {
+      const { visible } = req.body as { visible: boolean };
+      await db.execute(sql`INSERT INTO app_settings (key, value) VALUES ('cagnotte_visible', ${String(visible)}) ON CONFLICT (key) DO UPDATE SET value = ${String(visible)}`);
+      res.json({ visible });
+    } catch (err) {
+      res.status(500).json({ message: "Erreur serveur" });
+    }
+  });
+
+  // Decline Invitation Route — public, no auth required
+  app.get("/api/rsvp/decline/:token", async (req, res) => {
+    try {
+      const { token } = req.params;
+      if (!token) return res.redirect("/decline-confirmed?status=error");
+
+      const guest = await storage.getRsvpResponseByQrToken(token);
+      if (!guest) return res.redirect("/decline-confirmed?status=error");
+
+      // Already declined — do not process again
+      if (guest.status === "declined") {
+        return res.redirect(`/decline-confirmed?name=${encodeURIComponent(guest.firstName)}&status=already`);
+      }
+
+      await storage.updateRsvpResponse(guest.id, {
+        ...guest,
+        availability: "unavailable",
+        status: "declined",
+      } as any);
+
+      return res.redirect(`/decline-confirmed?name=${encodeURIComponent(guest.firstName)}`);
+    } catch (err) {
+      console.error("Error processing decline:", err);
+      return res.redirect("/decline-confirmed?status=error");
+    }
+  });
+
+  // Confirm attendance via token link (from reminder email)
+  app.get("/api/rsvp/confirm/:token", async (req, res) => {
+    try {
+      const { token } = req.params;
+      if (!token) return res.redirect("/rsvp-confirmed?status=error");
+
+      const guest = await storage.getRsvpResponseByQrToken(token);
+      if (!guest) return res.redirect("/rsvp-confirmed?status=error");
+
+      // Already confirmed — do not process again
+      if (guest.status === "confirmed") {
+        return res.redirect(`/rsvp-confirmed?name=${encodeURIComponent(guest.firstName)}&status=already`);
+      }
+
+      // "Both" availability guests → ask which date(s) they're confirming
+      if (guest.availability === "both") {
+        return res.redirect(
+          `/rsvp-confirm-choice?token=${encodeURIComponent(token)}&name=${encodeURIComponent(guest.firstName)}`
+        );
+      }
+
+      // Single date guests → confirm directly
+      await storage.updateRsvpResponse(guest.id, {
+        ...guest,
+        status: "confirmed",
+        confirmedAt: new Date(),
+      } as any);
+
+      return res.redirect(`/rsvp-confirmed?name=${encodeURIComponent(guest.firstName)}`);
+    } catch (err) {
+      console.error("Error processing confirm:", err);
+      return res.redirect("/rsvp-confirmed?status=error");
+    }
+  });
+
+  // Confirm choice for "both" availability guests
+  app.get("/api/rsvp/confirm-choice/:token", async (req, res) => {
+    try {
+      const { token } = req.params;
+      const choice = req.query.choice as string;
+
+      if (!token || !choice) return res.redirect("/rsvp-confirmed?status=error");
+      if (!["both", "19-march", "21-march"].includes(choice)) return res.redirect("/rsvp-confirmed?status=error");
+
+      const guest = await storage.getRsvpResponseByQrToken(token);
+      if (!guest) return res.redirect("/rsvp-confirmed?status=error");
+
+      // Already confirmed — do not process again
+      if (guest.status === "confirmed") {
+        return res.redirect(`/rsvp-confirmed?name=${encodeURIComponent(guest.firstName)}&status=already`);
+      }
+
+      await storage.updateRsvpResponse(guest.id, {
+        ...guest,
+        availability: choice,
+        status: "confirmed",
+        confirmedAt: new Date(),
+      } as any);
+
+      return res.redirect(`/rsvp-confirmed?name=${encodeURIComponent(guest.firstName)}&choice=${choice}`);
+    } catch (err) {
+      console.error("Error processing confirm-choice:", err);
+      return res.redirect("/rsvp-confirmed?status=error");
+    }
+  });
+
+  // Send reminder email to a single guest
+  app.post("/api/rsvp/:id/send-reminder", isLocallyAuthenticated, async (req, res) => {
+    try {
+      const id = parseInt(req.params.id);
+      const guest = await storage.getRsvpResponse(id);
+      if (!guest) return res.status(404).json({ error: "Invité non trouvé" });
+      if (!guest.email) return res.status(400).json({ error: "Cet invité n'a pas d'email" });
+
+      // Ensure qrToken exists
+      let token = guest.qrToken;
+      if (!token) {
+        token = crypto.randomUUID();
+        await storage.updateRsvpResponse(id, { ...guest, qrToken: token } as any);
+      }
+
+      await sendReminderEmail({
+        firstName: guest.firstName,
+        lastName: guest.lastName,
+        email: guest.email,
+        availability: guest.availability || "both",
+        qrToken: token,
+      });
+
+      await storage.updateRsvpResponse(id, { ...guest, qrToken: token, reminderSentAt: new Date() } as any);
+
+      res.json({ success: true });
+    } catch (err: any) {
+      console.error("Error sending reminder:", err);
+      res.status(500).json({ error: err.message || "Erreur lors de l'envoi" });
+    }
+  });
+
+  // Bulk send reminder emails
+  app.post("/api/rsvp/bulk-send-reminder", isLocallyAuthenticated, async (req, res) => {
+    try {
+      const { ids } = req.body as { ids: number[] };
+      if (!Array.isArray(ids) || ids.length === 0) return res.status(400).json({ error: "Aucun invité sélectionné" });
+
+      let sent = 0;
+      let failed = 0;
+
+      for (const id of ids) {
+        try {
+          const guest = await storage.getRsvpResponse(id);
+          if (!guest || !guest.email) { failed++; continue; }
+
+          let token = guest.qrToken;
+          if (!token) {
+            token = crypto.randomUUID();
+          }
+
+          await sendReminderEmail({
+            firstName: guest.firstName,
+            lastName: guest.lastName,
+            email: guest.email,
+            availability: guest.availability || "both",
+            qrToken: token,
+          });
+
+          await storage.updateRsvpResponse(id, { ...guest, qrToken: token, reminderSentAt: new Date() } as any);
+          sent++;
+        } catch {
+          failed++;
+        }
+      }
+
+      res.json({ sent, failed });
+    } catch (err: any) {
+      console.error("Error bulk sending reminders:", err);
+      res.status(500).json({ error: err.message });
+    }
+  });
+
+  // Reminder email preview — admin only
+  app.get("/api/rsvp/:id/reminder-preview", isLocallyAuthenticated, async (req, res) => {
+    try {
+      const id = parseInt(req.params.id);
+      const guest = await storage.getRsvpResponse(id);
+      if (!guest) return res.status(404).send("<h1>Invité non trouvé</h1>");
+
+      const domain = process.env.SITE_URL || (process.env.REPLIT_DEV_DOMAIN ? `https://${process.env.REPLIT_DEV_DOMAIN}` : "http://localhost:5000");
+      const confirmLink = guest.qrToken ? `${domain}/api/rsvp/confirm/${guest.qrToken}` : "#(lien-après-envoi)";
+      const declineLink = guest.qrToken ? `${domain}/api/rsvp/decline/${guest.qrToken}` : "#(lien-après-envoi)";
+
+      const now = new Date();
+      const date19 = new Date("2026-03-19T00:00:00Z");
+      const date21 = new Date("2026-03-21T00:00:00Z");
+      const targetDate = guest.availability === "21-march" ? date21 : date19;
+      const weddingDateLabel = guest.availability === "21-march" ? "21 mars 2026" : "19 mars 2026";
+      const daysUntil = Math.max(0, Math.ceil((targetDate.getTime() - now.getTime()) / (1000 * 60 * 60 * 24)));
+
+      const html = buildReminderEmailHtml({ firstName: guest.firstName, daysUntil, weddingDateLabel, confirmLink, declineLink });
+
+      res.setHeader("Content-Type", "text/html; charset=utf-8");
+      res.send(html);
+    } catch (err) {
+      res.status(500).send("<h1>Erreur</h1>");
+    }
+  });
+
+  // Email Preview Route — admin only
+  app.get("/api/rsvp/:id/email-preview", isLocallyAuthenticated, async (req, res) => {
+    try {
+      const id = parseInt(req.params.id);
+      const type = req.query.type as string || "21";
+      const guest = await storage.getRsvpResponse(id);
+      if (!guest) return res.status(404).send("<h1>Invité non trouvé</h1>");
+
+      const domain = process.env.SITE_URL || (process.env.REPLIT_DEV_DOMAIN ? `https://${process.env.REPLIT_DEV_DOMAIN}` : "http://localhost:5000");
+      const declineLink = guest.qrToken ? `${domain}/api/rsvp/decline/${guest.qrToken}` : "#(lien-après-envoi)";
+
+      let html: string;
+      if (type === "gala") {
+        const invName = buildInvitationName(guest.firstName, guest.lastName, guest.partySize || 1);
+        const tableParam = guest.tableNumber ? `&table=${guest.tableNumber}` : "";
+        const galaLink = `${domain}/gala/${encodeURIComponent(invName)}?type=${guest.invitationType || 1}${tableParam}`;
+        html = buildGalaEmailHtml({ firstName: guest.firstName, galaLink, declineLink });
+      } else {
+        const invitationLink = `${domain}/guest/${guest.id}`;
+        html = buildInvitation21EmailHtml({ firstName: guest.firstName, invitationLink, declineLink });
+      }
+
+      res.setHeader("Content-Type", "text/html; charset=utf-8");
+      res.send(html);
+    } catch (err) {
+      console.error("Error generating email preview:", err);
+      res.status(500).send("<h1>Erreur</h1>");
+    }
+  });
+
   // Check-in Route
   app.get("/api/checkin", async (req, res) => {
     try {
@@ -378,6 +678,57 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Remove check-in
+  app.delete("/api/checkin/:id", async (req, res) => {
+    try {
+      const id = parseInt(req.params.id);
+      await db.update(rsvpResponses)
+        .set({ checkedInAt: null })
+        .where(eq(rsvpResponses.id, id));
+      res.json({ success: true });
+    } catch (error) {
+      res.status(500).json({ message: "Erreur lors de la suppression" });
+    }
+  });
+
+  // Accueil agents - public guest list (limited fields)
+  app.get("/api/accueil/guests", async (req, res) => {
+    try {
+      const guests = await storage.getAllRsvpResponses();
+      const limited = guests.map(g => ({
+        id: g.id,
+        firstName: g.firstName,
+        lastName: g.lastName,
+        partySize: g.partySize,
+        tableNumber: g.tableNumber,
+        availability: g.availability,
+        checkedInAt: g.checkedInAt,
+      }));
+      res.json(limited);
+    } catch (error) {
+      res.status(500).json({ message: "Erreur serveur" });
+    }
+  });
+
+  // Bulk assign table to multiple guests
+  app.post("/api/rsvp/bulk-assign-table", isLocallyAuthenticated, async (req, res) => {
+    try {
+      const { ids, tableNumber } = req.body;
+      if (!Array.isArray(ids) || ids.length === 0) {
+        return res.status(400).json({ message: "Liste d'IDs requise" });
+      }
+      for (const id of ids) {
+        const guest = await storage.getRsvpResponse(id);
+        if (guest) {
+          await storage.updateRsvpResponse(id, { ...guest, tableNumber: tableNumber ?? null } as any);
+        }
+      }
+      res.json({ success: true, count: ids.length });
+    } catch (error) {
+      res.status(500).json({ message: "Erreur serveur" });
+    }
+  });
+
   // Send Invitation (Email) - Specific Guest
   app.post("/api/rsvp/:id/send-invitation", isLocallyAuthenticated, async (req, res) => {
     try {
@@ -425,6 +776,201 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Send Invitation 21 Email - Specific Guest
+  app.post("/api/rsvp/:id/send-invitation-21", isLocallyAuthenticated, async (req, res) => {
+    try {
+      const id = parseInt(req.params.id);
+      let guest = await storage.getRsvpResponse(id);
+      if (!guest) return res.status(404).json({ message: "Invité non trouvé" });
+      if (!guest.email) return res.status(400).json({ message: "Email manquant pour cet invité" });
+
+      let qrToken = guest.qrToken;
+      if (!qrToken) {
+        qrToken = crypto.randomUUID();
+        guest = await storage.updateRsvpResponse(id, { ...guest, qrToken } as any);
+      }
+
+      await sendInvitation21Email({
+        id: guest.id,
+        email: guest.email!,
+        firstName: guest.firstName,
+        lastName: guest.lastName,
+        qrToken: qrToken!,
+      });
+
+      await db
+        .update(rsvpResponses)
+        .set({ invitation21SentAt: new Date() })
+        .where(eq(rsvpResponses.id, id));
+
+      res.json({ success: true });
+    } catch (err) {
+      console.error(err);
+      res.status(500).json({ message: "Erreur lors de l'envoi de l'invitation 21" });
+    }
+  });
+
+  // Bulk Send Invitation 21 Email
+  app.post("/api/rsvp/bulk-send-invitation-21", isLocallyAuthenticated, async (req, res) => {
+    try {
+      const { ids } = req.body;
+      if (!Array.isArray(ids)) {
+        return res.status(400).json({ message: "Liste d'identifiants requise" });
+      }
+
+      let successCount = 0;
+      let errorCount = 0;
+
+      for (const id of ids) {
+        try {
+          const guest = await storage.getRsvpResponse(id);
+          if (!guest || !guest.email) {
+            errorCount++;
+            continue;
+          }
+
+          await sendInvitation21Email({
+            id: guest.id,
+            email: guest.email,
+            firstName: guest.firstName,
+            lastName: guest.lastName,
+            qrToken: guest.qrToken ?? undefined,
+          });
+
+          await db
+            .update(rsvpResponses)
+            .set({ invitation21SentAt: new Date() })
+            .where(eq(rsvpResponses.id, id));
+
+          successCount++;
+        } catch (err) {
+          console.error(`Error sending invitation 21 to guest ${id}:`, err);
+          errorCount++;
+        }
+      }
+
+      res.json({ success: true, successCount, errorCount });
+    } catch (error) {
+      console.error("Error bulk sending invitation 21:", error);
+      res.status(500).json({ message: "Erreur lors de l'envoi groupé" });
+    }
+  });
+
+  // Smart Send Invitation - sends DOT19, Gala 21, or both based on availability
+  app.post("/api/rsvp/:id/send-smart-invitation", isLocallyAuthenticated, async (req, res) => {
+    try {
+      const id = parseInt(req.params.id);
+      let guest = await storage.getRsvpResponse(id);
+      if (!guest) return res.status(404).json({ message: "Invité non trouvé" });
+      if (!guest.email) return res.status(400).json({ message: "Email manquant pour cet invité" });
+
+      const avail = guest.availability;
+      const sent: string[] = [];
+
+      if (avail === "19-march" || avail === "both") {
+        let qrToken = guest.qrToken;
+        if (!qrToken) {
+          qrToken = crypto.randomUUID();
+          guest = await storage.updateRsvpResponse(id, { ...guest, qrToken } as any);
+        }
+        await sendPersonalizedInvitation({
+          id: guest.id,
+          email: guest.email!,
+          firstName: guest.firstName,
+          lastName: guest.lastName,
+          qrToken: qrToken!,
+        });
+        await storage.updateRsvpResponse(id, { ...guest, invitationSentAt: new Date(), status: "confirmed" } as any);
+        sent.push("19");
+      }
+
+      if (avail === "21-march" || avail === "both") {
+        // Ensure qrToken exists (may have been set in 19-march branch above)
+        let qrToken21 = guest.qrToken;
+        if (!qrToken21) {
+          qrToken21 = crypto.randomUUID();
+          guest = await storage.updateRsvpResponse(id, { ...guest, qrToken: qrToken21 } as any);
+        }
+        await sendInvitation21Email({
+          id: guest.id,
+          email: guest.email!,
+          firstName: guest.firstName,
+          lastName: guest.lastName,
+          qrToken: qrToken21!,
+        });
+        await db.update(rsvpResponses).set({ invitation21SentAt: new Date() }).where(eq(rsvpResponses.id, id));
+        sent.push("21");
+      }
+
+      res.json({ success: true, sent });
+    } catch (err) {
+      console.error(err);
+      res.status(500).json({ message: "Erreur lors de l'envoi de l'invitation" });
+    }
+  });
+
+  // Bulk Smart Send Invitation
+  app.post("/api/rsvp/bulk-send-smart-invitation", isLocallyAuthenticated, async (req, res) => {
+    try {
+      const { ids } = req.body;
+      if (!Array.isArray(ids)) return res.status(400).json({ message: "Liste d'identifiants requise" });
+
+      let successCount = 0;
+      let errorCount = 0;
+
+      for (const id of ids) {
+        try {
+          let guest = await storage.getRsvpResponse(id);
+          if (!guest || !guest.email) { errorCount++; continue; }
+
+          const avail = guest.availability;
+
+          if (avail === "19-march" || avail === "both") {
+            let qrToken = guest.qrToken;
+            if (!qrToken) {
+              qrToken = crypto.randomUUID();
+              guest = await storage.updateRsvpResponse(id, { ...guest, qrToken } as any);
+            }
+            await sendPersonalizedInvitation({
+              id: guest.id,
+              email: guest.email!,
+              firstName: guest.firstName,
+              lastName: guest.lastName,
+              qrToken: qrToken!,
+            });
+            await storage.updateRsvpResponse(id, { ...guest, invitationSentAt: new Date(), status: "confirmed" } as any);
+          }
+
+          if (avail === "21-march" || avail === "both") {
+            let qrToken21 = guest.qrToken;
+            if (!qrToken21) {
+              qrToken21 = crypto.randomUUID();
+              guest = await storage.updateRsvpResponse(id, { ...guest, qrToken: qrToken21 } as any);
+            }
+            await sendInvitation21Email({
+              id: guest.id,
+              email: guest.email!,
+              firstName: guest.firstName,
+              lastName: guest.lastName,
+              qrToken: qrToken21!,
+            });
+            await db.update(rsvpResponses).set({ invitation21SentAt: new Date() }).where(eq(rsvpResponses.id, id));
+          }
+
+          successCount++;
+        } catch (err) {
+          console.error(`Error sending smart invitation to guest ${id}:`, err);
+          errorCount++;
+        }
+      }
+
+      res.json({ success: true, successCount, errorCount });
+    } catch (error) {
+      console.error("Error bulk sending smart invitations:", error);
+      res.status(500).json({ message: "Erreur lors de l'envoi groupé" });
+    }
+  });
+
   // Resend Confirmation Email - Specific Guest
   app.post("/api/rsvp/:id/resend-confirmation", isLocallyAuthenticated, async (req, res) => {
     try {
@@ -449,6 +995,40 @@ export async function registerRoutes(app: Express): Promise<Server> {
     } catch (err) {
       console.error(err);
       res.status(500).json({ message: "Erreur lors de l'envoi du mail de confirmation" });
+    }
+  });
+
+  // Send Gala Invitation Email
+  app.post("/api/rsvp/:id/send-gala-invitation", isLocallyAuthenticated, async (req, res) => {
+    try {
+      const id = parseInt(req.params.id);
+      let guest = await storage.getRsvpResponse(id);
+      if (!guest) return res.status(404).json({ message: "Invité non trouvé" });
+      if (!guest.email) return res.status(400).json({ message: "Email manquant pour cet invité" });
+
+      let qrToken = guest.qrToken;
+      if (!qrToken) {
+        qrToken = crypto.randomUUID();
+        guest = await storage.updateRsvpResponse(id, { ...guest, qrToken } as any);
+      }
+
+      const domain = process.env.SITE_URL || (process.env.REPLIT_DEV_DOMAIN ? `https://${process.env.REPLIT_DEV_DOMAIN}` : 'http://localhost:5000');
+      const invName = buildInvitationName(guest.firstName, guest.lastName, guest.partySize || 1);
+      const tableParam = guest.tableNumber ? `&table=${guest.tableNumber}` : "";
+      const galaLink = `${domain}/gala/${encodeURIComponent(invName)}?type=${guest.invitationType || 1}${tableParam}`;
+
+      await sendGalaInvitationEmail({
+        email: guest.email!,
+        firstName: guest.firstName,
+        lastName: guest.lastName,
+        galaLink,
+        qrToken: qrToken!,
+      });
+
+      res.json({ success: true });
+    } catch (err) {
+      console.error(err);
+      res.status(500).json({ message: "Erreur lors de l'envoi de l'invitation gala" });
     }
   });
 
@@ -636,6 +1216,68 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // Guest invitation page - get guest data and matching PDF
+  app.post("/api/invitation/guest/:id/track-view", async (req, res) => {
+    try {
+      const id = parseInt(req.params.id);
+      if (isNaN(id)) return res.status(400).json({ message: "ID invalide" });
+
+      const guest = await storage.getRsvpResponse(id);
+      if (!guest) return res.status(404).json({ message: "Invité non trouvé" });
+
+      await db
+        .update(rsvpResponses)
+        .set({ invitationViewedAt: new Date() })
+        .where(eq(rsvpResponses.id, id));
+
+      res.json({ success: true });
+    } catch (err) {
+      console.error(err);
+      res.status(500).json({ message: "Erreur" });
+    }
+  });
+
+  app.post("/api/rsvp/:id/toggle-seating", isLocallyAuthenticated, async (req, res) => {
+    try {
+      const id = parseInt(req.params.id);
+      if (isNaN(id)) return res.status(400).json({ message: "ID invalide" });
+
+      const guest = await storage.getRsvpResponse(id);
+      if (!guest) return res.status(404).json({ message: "Invité non trouvé" });
+
+      const [updated] = await db
+        .update(rsvpResponses)
+        .set({ seatingConfirmed: !guest.seatingConfirmed })
+        .where(eq(rsvpResponses.id, id))
+        .returning();
+
+      res.json(updated);
+    } catch (err) {
+      console.error(err);
+      res.status(500).json({ message: "Erreur" });
+    }
+  });
+
+  app.post("/api/rsvp/:id/toggle-brunch", isLocallyAuthenticated, async (req, res) => {
+    try {
+      const id = parseInt(req.params.id);
+      if (isNaN(id)) return res.status(400).json({ message: "ID invalide" });
+
+      const guest = await storage.getRsvpResponse(id);
+      if (!guest) return res.status(404).json({ message: "Invité non trouvé" });
+
+      const [updated] = await db
+        .update(rsvpResponses)
+        .set({ brunchInvited: !guest.brunchInvited })
+        .where(eq(rsvpResponses.id, id))
+        .returning();
+
+      res.json(updated);
+    } catch (err) {
+      console.error(err);
+      res.status(500).json({ message: "Erreur" });
+    }
+  });
+
   app.get("/api/invitation/guest/:id", async (req, res) => {
     try {
       const id = parseInt(req.params.id);
@@ -753,6 +1395,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
         lastName: response.lastName,
         availability: response.availability,
         partySize: response.partySize || 1,
+        invitationType: response.invitationType || 1,
+        tableNumber: response.tableNumber || null,
+        brunchInvited: response.brunchInvited ?? false,
         pdfUrl,
       });
     } catch (error) {
@@ -1012,6 +1657,63 @@ export async function registerRoutes(app: Express): Promise<Server> {
     } catch (error) {
       console.error("Error generating invitation:", error);
       res.status(500).json({ message: "Erreur lors de la génération de l'invitation" });
+    }
+  });
+
+  // ─── Gift List Routes ───────────────────────────────────────────
+  app.get("/api/gift-list", async (_req, res) => {
+    try {
+      const list = await db.select().from(giftListSignups).orderBy(asc(giftListSignups.position), asc(giftListSignups.createdAt));
+      res.json(list);
+    } catch (err) {
+      res.status(500).json({ message: "Erreur serveur" });
+    }
+  });
+
+  app.post("/api/gift-list", async (req, res) => {
+    try {
+      const parsed = insertGiftListSignupSchema.safeParse(req.body);
+      if (!parsed.success) return res.status(400).json({ message: "Nom requis" });
+      const existing = await db.select().from(giftListSignups).orderBy(asc(giftListSignups.position));
+      const maxPos = existing.length > 0 ? Math.max(...existing.map(e => e.position)) : -1;
+      const [created] = await db.insert(giftListSignups).values({ name: parsed.data.name.trim(), position: maxPos + 1 }).returning();
+      res.json(created);
+    } catch (err) {
+      res.status(500).json({ message: "Erreur serveur" });
+    }
+  });
+
+  app.patch("/api/gift-list/reorder", async (req, res) => {
+    try {
+      const { order } = req.body as { order: { id: number; position: number }[] };
+      if (!Array.isArray(order)) return res.status(400).json({ message: "Format invalide" });
+      for (const item of order) {
+        await db.update(giftListSignups).set({ position: item.position }).where(eq(giftListSignups.id, item.id));
+      }
+      res.json({ success: true });
+    } catch (err) {
+      res.status(500).json({ message: "Erreur serveur" });
+    }
+  });
+
+  app.patch("/api/gift-list/:id/recorded", async (req, res) => {
+    try {
+      const id = parseInt(req.params.id);
+      const { isRecorded } = req.body as { isRecorded: boolean };
+      const [updated] = await db.update(giftListSignups).set({ isRecorded }).where(eq(giftListSignups.id, id)).returning();
+      res.json(updated);
+    } catch (err) {
+      res.status(500).json({ message: "Erreur serveur" });
+    }
+  });
+
+  app.delete("/api/gift-list/:id", async (req, res) => {
+    try {
+      const id = parseInt(req.params.id);
+      await db.delete(giftListSignups).where(eq(giftListSignups.id, id));
+      res.json({ success: true });
+    } catch (err) {
+      res.status(500).json({ message: "Erreur serveur" });
     }
   });
 

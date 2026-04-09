@@ -638,13 +638,15 @@ export default function Landing() {
                                 disabled
                                 className="text-muted-foreground"
                               >
-                                19 mars seulement — COMPLET
+                                19 mars seulement — SOLD OUT
                               </SelectItem>
                               <SelectItem
                                 value="21-march"
                                 data-testid="option-21-march"
+                                disabled
+                                className="text-muted-foreground"
                               >
-                                21 mars seulement
+                                21 mars seulement — SOLD OUT
                               </SelectItem>
                               <SelectItem
                                 value="unavailable"
@@ -867,7 +869,7 @@ export default function Landing() {
                     <p className="text-sm text-muted-foreground">
                       Rhode-Saint-Genèse
                       <br />
-                      11h00
+                      10h30
                     </p>
                   </div>
                 </div>
