@@ -166,8 +166,8 @@ export default function LivreDorPage() {
       queryClient.invalidateQueries({ queryKey: ["/api/guestbook/messages"] });
       form.reset();
       toast({
-        title: "Message publie",
-        description: "Votre mot doux vient d'etre ajoute au nuage de messages.",
+        title: "Message publié",
+        description: "Votre mot doux vient d'être ajouté au nuage de messages.",
       });
     },
     onError: (error: Error) => {
@@ -369,7 +369,7 @@ export default function LivreDorPage() {
               <Card className="border-destructive/20 bg-white/85 p-8 text-center">
                 <p className="font-serif text-2xl text-foreground">Impossible de charger le nuage de messages.</p>
                 <p className="mt-3 text-sm text-muted-foreground">
-                  Le design est pret, mais les messages n'ont pas pu etre recuperes pour le moment.
+                  Le design est prêt, mais les messages n'ont pas pu être récupérés pour le moment.
                 </p>
               </Card>
             ) : messages.length === 0 ? (
@@ -406,7 +406,7 @@ export default function LivreDorPage() {
                 <div>
                   <h2 className="font-serif text-3xl text-[#4b351b]">Ajouter un message</h2>
                   <p className="mt-1 text-sm text-[#7a6141]">
-                    Il sera melange au nuage avec les messages de la cagnotte.
+                    Il sera mélangé au nuage avec les messages de la cagnotte.
                   </p>
                 </div>
               </div>
@@ -447,7 +447,7 @@ export default function LivreDorPage() {
                           />
                         </FormControl>
                         <div className="flex items-center justify-between text-xs text-[#8a6b42]">
-                          <span>Minimum 8 caracteres</span>
+                          <span>Minimum 8 caractères</span>
                           <span>{field.value?.length ?? 0}/1200</span>
                         </div>
                         <FormMessage />

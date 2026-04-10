@@ -160,8 +160,8 @@ export const guestbookEntries = pgTable("guestbook_entries", {
 });
 
 export const insertGuestbookEntrySchema = z.object({
-  authorName: z.string().min(2, "Veuillez entrer votre nom").max(255, "Maximum 255 caracteres"),
-  message: z.string().min(8, "Votre message doit contenir au moins 8 caracteres").max(1200, "Maximum 1200 caracteres"),
+  authorName: z.string().min(2, "Veuillez entrer votre nom").max(255, "Maximum 255 caractères"),
+  message: z.string().min(8, "Votre message doit contenir au moins 8 caractères").max(1200, "Maximum 1200 caractères"),
 });
 
 export type InsertGuestbookEntry = z.infer<typeof insertGuestbookEntrySchema>;
